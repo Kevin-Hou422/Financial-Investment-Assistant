@@ -6,7 +6,7 @@ import AssetList from './components/AssetList';
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-gray-100 text-gray-800 font-sans">
+      <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
         <Navbar />
         <div className="container mx-auto p-6">
           <Routes>
