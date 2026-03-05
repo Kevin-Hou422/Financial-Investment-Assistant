@@ -1,5 +1,8 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
+from app.external.crypto_api import fetch_crypto_price
+from app.external.fund_api import fetch_fund_price
+from app.external.gold_api import fetch_gold_price
 from app.external.stock_api import fetch_stock_price
 
 
@@ -10,15 +13,27 @@ router = APIRouter(prefix="/api/market", tags=["market"])
 @router.get("/price/{symbol}")
 async def get_market_price(
     symbol: str,
-    asset_type: str = Query("stock", description="资产类型：stock/fund/crypto/gold"),
+    asset_type: str = Query(
+        "stock",
+        description="资产类型：stock/fund/crypto/gold",
+        regex="^(stock|fund|crypto|gold)$",
+    ),
 ):
     """
     获取单一资产的当前行情（价格、涨跌幅、时间戳等）。
 
-    目前主要通过 yfinance 实现，未来可以在 external 模块中扩展不同资产类型的实现。
+    会根据 asset_type 分发到不同 external 模块，便于按资产类型扩展实现。
     """
-    # 目前先统一走股票/基金实现，后续根据 asset_type 拆分到不同 external 模块
-    return fetch_stock_price(symbol=symbol, asset_type=asset_type)
+    if asset_type == "stock":
+        return fetch_stock_price(symbol=symbol, asset_type=asset_type)
+    if asset_type == "fund":
+        return fetch_fund_price(symbol=symbol)
+    if asset_type == "crypto":
+        return fetch_crypto_price(symbol=symbol)
+    if asset_type == "gold":
+        return fetch_gold_price(symbol=symbol)
+
+    raise HTTPException(status_code=400, detail="Unsupported asset_type")
 
 
 @router.get("/snapshot")
