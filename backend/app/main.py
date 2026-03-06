@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import asset, market, portfolio
+from app.routes import asset, market, portfolio, risk
 from app.utils.generate_strategy import generate_strategy
 
 
@@ -23,6 +23,9 @@ app.include_router(market.router)
 
 # 投资组合概览与盈亏接口（/api/portfolio/...）
 app.include_router(portfolio.router)
+
+# 风险分析接口（/api/risk/...）
+app.include_router(risk.router)
 
 
 @app.get("/api/strategy")
