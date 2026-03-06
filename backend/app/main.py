@@ -11,6 +11,7 @@ from app.routes import (
     report,
     risk,
 )
+from app.scheduler.market_scheduler import setup_scheduler
 from app.utils.generate_strategy import generate_strategy
 
 
@@ -47,6 +48,9 @@ app.include_router(report.router)
 
 # 通知接口（/api/notifications）
 app.include_router(notification.router)
+
+# 定时任务：行情与风险刷新
+setup_scheduler(app)
 
 
 @app.get("/api/strategy")
