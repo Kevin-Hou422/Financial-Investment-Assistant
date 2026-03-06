@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
 import AssetList from './components/AssetList';
+import CashflowTable from './components/CashflowTable';
+import PlanManager from './components/PlanManager';
 
 function App() {
   return (
@@ -12,6 +14,8 @@ function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/assets" element={<AssetList />} />
+            <Route path="/cashflows" element={<CashflowTable />} />
+            <Route path="/plans" element={<PlanManager />} />
           </Routes>
         </div>
       </div>
