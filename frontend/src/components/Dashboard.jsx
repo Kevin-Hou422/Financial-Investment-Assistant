@@ -18,6 +18,8 @@ import MarketTickerPanel from './MarketTickerPanel';
 import RiskAnalysisPanel from './RiskAnalysisPanel';
 import { riskService } from '../services/riskService';
 import PortfolioConcentrationPanel from './PortfolioConcentrationPanel';
+import NotificationPanel from './NotificationPanel';
+import ReportExportPanel from './ReportExportPanel';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#6366F1'];
 
@@ -115,12 +117,15 @@ export default function Dashboard() {
 
       <MarketTickerPanel />
 
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <h3 className="text-lg font-bold mb-4">Risk Overview</h3>
-        <RiskAnalysisPanel
-          volatility={risk.volatility}
-          maxDrawdown={risk.max_drawdown}
-        />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <h3 className="text-lg font-bold mb-4">Risk Overview</h3>
+          <RiskAnalysisPanel
+            volatility={risk.volatility}
+            maxDrawdown={risk.max_drawdown}
+          />
+        </div>
+        <NotificationPanel />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -173,6 +178,8 @@ export default function Dashboard() {
         </div>
         <PortfolioConcentrationPanel />
       </div>
+
+      <ReportExportPanel />
     </div>
   );
 }
