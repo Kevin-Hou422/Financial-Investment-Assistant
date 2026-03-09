@@ -13,20 +13,36 @@ export default function AssetList() {
   useEffect(() => { loadAssets(); }, []);
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this asset?")) {
+    if (!window.confirm('Are you sure you want to delete this asset?')) return;
+    try {
       await deleteAsset(id);
       loadAssets();
+    } catch (e) {
+      // Surface backend error to the user
+      const message =
+        e?.response?.data?.detail ||
+        e?.message ||
+        'Failed to delete asset. Please check backend logs.';
+      alert(message);
     }
   };
 
   const handleSave = async (data) => {
+    try {
       if (editingAsset) {
-          await updateAsset(editingAsset.id, data);
-          setEditingAsset(null);
+        await updateAsset(editingAsset.id, data);
+        setEditingAsset(null);
       } else {
-          await createAsset(data);
+        await createAsset(data);
       }
       loadAssets();
+    } catch (e) {
+      const message =
+        e?.response?.data?.detail ||
+        e?.message ||
+        'Failed to save asset. Please check backend logs.';
+      alert(message);
+    }
   };
 
   const filteredAssets = assets

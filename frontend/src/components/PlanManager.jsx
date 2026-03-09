@@ -23,23 +23,39 @@ export default function PlanManager() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await planService.create({
-      ...form,
-      target_amount: Number(form.target_amount),
-      current_amount: Number(form.current_amount),
-    });
-    setForm({
-      name: '',
-      target_amount: '',
-      current_amount: '',
-      deadline: '',
-    });
-    load();
+    try {
+      await planService.create({
+        ...form,
+        target_amount: Number(form.target_amount),
+        current_amount: Number(form.current_amount),
+      });
+      setForm({
+        name: '',
+        target_amount: '',
+        current_amount: '',
+        deadline: '',
+      });
+      load();
+    } catch (error) {
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        'Failed to create goal. Please check backend logs.';
+      alert(message);
+    }
   };
 
   const handleDelete = async (id) => {
-    await planService.remove(id);
-    load();
+    try {
+      await planService.remove(id);
+      load();
+    } catch (error) {
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        'Failed to delete goal. Please check backend logs.';
+      alert(message);
+    }
   };
 
   const today = new Date().toISOString().split('T')[0];

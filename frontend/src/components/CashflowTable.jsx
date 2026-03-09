@@ -24,22 +24,38 @@ export default function CashflowTable() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await cashflowService.create({
-      ...form,
-      amount: Number(form.amount),
-    });
-    setForm({
-      type: 'Deposit',
-      amount: '',
-      date: '',
-      note: '',
-    });
-    load();
+    try {
+      await cashflowService.create({
+        ...form,
+        amount: Number(form.amount),
+      });
+      setForm({
+        type: 'Deposit',
+        amount: '',
+        date: '',
+        note: '',
+      });
+      load();
+    } catch (error) {
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        'Failed to create cashflow. Please check backend logs.';
+      alert(message);
+    }
   };
 
   const handleDelete = async (id) => {
-    await cashflowService.remove(id);
-    load();
+    try {
+      await cashflowService.remove(id);
+      load();
+    } catch (error) {
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        'Failed to delete cashflow. Please check backend logs.';
+      alert(message);
+    }
   };
 
   const today = new Date().toISOString().split('T')[0];
