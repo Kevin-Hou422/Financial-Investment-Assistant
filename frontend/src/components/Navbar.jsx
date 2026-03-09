@@ -18,13 +18,31 @@ export default function Navbar() {
         Dashboard
       </Link>
       <Link to="/assets" className={getNavClass('/assets')}>
-        Asset Management
+        All Assets
+      </Link>
+      <Link to="/assets/stocks" className={getNavClass('/assets/stocks')}>
+        Stocks
+      </Link>
+      <Link to="/assets/crypto" className={getNavClass('/assets/crypto')}>
+        Crypto
+      </Link>
+      <Link to="/assets/gold" className={getNavClass('/assets/gold')}>
+        Gold
       </Link>
       <Link to="/cashflows" className={getNavClass('/cashflows')}>
         Cashflows
       </Link>
       <Link to="/plans" className={getNavClass('/plans')}>
         Goals
+      </Link>
+      <Link to="/watchlist" className={getNavClass('/watchlist')}>
+        Watchlist
+      </Link>
+      <Link to="/alerts" className={getNavClass('/alerts')}>
+        Alerts
+      </Link>
+      <Link to="/news" className={getNavClass('/news')}>
+        News
       </Link>
     </nav>
   );

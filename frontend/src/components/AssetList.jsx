@@ -3,10 +3,10 @@ import { getAssets, deleteAsset, createAsset, updateAsset } from '../services/ap
 import AssetForm from './AssetForm';
 import { formatCurrency } from '../utils/helpers';
 
-export default function AssetList() {
+export default function AssetList({ defaultType }) {
   const [assets, setAssets] = useState([]);
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState('');
+  const [filterType, setFilterType] = useState(defaultType || '');
   const [editingAsset, setEditingAsset] = useState(null);
 
   const loadAssets = () => getAssets().then(res => setAssets(res.data));
@@ -57,9 +57,15 @@ export default function AssetList() {
       <div className="bg-white p-6 rounded-lg shadow-sm border">
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <input placeholder="Search by name..." className="border p-2 rounded flex-1 outline-none focus:border-blue-500" value={search} onChange={e => setSearch(e.target.value)} />
-          <select className="border p-2 rounded outline-none" value={filterType} onChange={e => setFilterType(e.target.value)}>
+          <select
+            className="border p-2 rounded outline-none"
+            value={filterType}
+            onChange={e => setFilterType(e.target.value)}
+          >
             <option value="">All Types</option>
-            {['Stock', 'Fund', 'Crypto', 'Gold'].map(t => <option key={t} value={t}>{t}</option>)}
+            {['Stock', 'Fund', 'Crypto', 'Gold', 'Bond', 'Forex', 'Custom'].map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
           </select>
         </div>
         

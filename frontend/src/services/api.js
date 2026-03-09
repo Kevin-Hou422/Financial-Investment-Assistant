@@ -1,7 +1,9 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'http://localhost:8000/api',
+  // Use relative baseURL so Vite proxy can forward to backend.
+  // You can override with VITE_API_BASE_URL if needed.
+  baseURL: import.meta?.env?.VITE_API_BASE_URL || '/api',
 });
 
 export const getAssets = (type = '') => api.get(`/assets${type ? `?type=${type}` : ''}`);

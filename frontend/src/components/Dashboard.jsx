@@ -20,6 +20,7 @@ import { riskService } from '../services/riskService';
 import PortfolioConcentrationPanel from './PortfolioConcentrationPanel';
 import NotificationPanel from './NotificationPanel';
 import ReportExportPanel from './ReportExportPanel';
+import AnalyticsPanel from './AnalyticsPanel';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#6366F1'];
 
@@ -179,7 +180,10 @@ export default function Dashboard() {
         <PortfolioConcentrationPanel />
       </div>
 
-      <ReportExportPanel />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ReportExportPanel />
+        <AnalyticsPanel />
+      </div>
     </div>
   );
 }

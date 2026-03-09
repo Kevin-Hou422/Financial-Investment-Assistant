@@ -2,14 +2,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes import (
+    agent,
+    alerts,
+    analytics,
     asset,
     cashflow,
     market,
+    news,
     notification,
     plan,
     portfolio,
     report,
     risk,
+    watchlist,
 )
 from app.scheduler.market_scheduler import setup_scheduler
 from app.utils.generate_strategy import generate_strategy
@@ -25,31 +30,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 资产管理接口
+# Asset management
 app.include_router(asset.router)
 
-# 资金流水接口
+# Cashflows
 app.include_router(cashflow.router)
 
-# 投资目标与计划接口
+# Plans / goals
 app.include_router(plan.router)
 
-# 实时行情接口（/api/market/...）
+# Market data
 app.include_router(market.router)
 
-# 投资组合概览与盈亏接口（/api/portfolio/...）
+# Portfolio overview
 app.include_router(portfolio.router)
 
-# 风险分析接口（/api/risk/...）
+# Risk metrics
 app.include_router(risk.router)
 
-# 报表接口（/api/reports/...）
+# Reports
 app.include_router(report.router)
 
-# 通知接口（/api/notifications）
+# Notifications
 app.include_router(notification.router)
 
-# 定时任务：行情与风险刷新
+# Watchlist
+app.include_router(watchlist.router)
+
+# Alerts
+app.include_router(alerts.router)
+
+# News
+app.include_router(news.router)
+
+# Analytics
+app.include_router(analytics.router)
+
+# Agent placeholder endpoints
+app.include_router(agent.router)
+
+# Scheduler: background refresh
 setup_scheduler(app)
 
 

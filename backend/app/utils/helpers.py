@@ -16,7 +16,16 @@ def calculate_type_percentage(assets: List[Dict]) -> Dict[str, float]:
 def validate_asset_data(data: dict) -> bool:
     if data.get("quantity", 0) <= 0 or data.get("price", 0) <= 0:
         return False
-    valid_types = ["Stock", "Fund", "Crypto", "Gold"]
+    # Extended asset types to cover new requirements
+    valid_types = [
+        "Stock",
+        "Fund",
+        "Crypto",
+        "Gold",
+        "Bond",
+        "Forex",
+        "Custom",
+    ]
     if data.get("type") not in valid_types:
         return False
     return True

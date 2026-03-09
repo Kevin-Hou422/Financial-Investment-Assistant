@@ -11,6 +11,15 @@ from app.interfaces.agent_portfolio_interface import get_current_portfolio
 from app.interfaces.agent_risk_interface import get_risk_metrics
 
 
+def _build_payload() -> Dict[str, Any]:
+    return {
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "market": get_market_snapshot(),
+        "portfolio": get_current_portfolio(),
+        "risk": get_risk_metrics(),
+    }
+
+
 async def _scheduler_loop() -> None:
     """
     每 5 分钟刷新一次：
@@ -20,13 +29,14 @@ async def _scheduler_loop() -> None:
 
     并将结果写入缓存文件，供未来扩展（如 Agent 或监控服务）使用。
     """
+    # Give the API a moment to finish startup before the first refresh
+    await asyncio.sleep(2)
+
     while True:
-        payload: Dict[str, Any] = {
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            "market": get_market_snapshot(),
-            "portfolio": get_current_portfolio(),
-            "risk": get_risk_metrics(),
-        }
+        # Run synchronous / network-heavy snapshot in a worker thread so it
+        # won't block the event loop (and therefore won't prevent the server
+        # from handling requests).
+        payload = await asyncio.to_thread(_build_payload)
         try:
             with open(SCHEDULER_CACHE_FILE, "w", encoding="utf-8") as f:
                 json.dump(payload, f, ensure_ascii=False, indent=2)

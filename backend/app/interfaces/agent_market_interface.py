@@ -8,6 +8,20 @@ from app.external.gold_api import fetch_gold_price
 from app.external.stock_api import fetch_stock_price
 
 
+def _looks_like_symbol(value: str) -> bool:
+    """
+    Basic sanity check to avoid calling market APIs with non-symbol strings
+    (e.g., names in other languages).
+    """
+    if not value:
+        return False
+    value = value.strip()
+    if len(value) > 20:
+        return False
+    allowed = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.^-=/_")
+    return all(ch in allowed for ch in value)
+
+
 def _fetch_for_asset_type(symbol: str, asset_type: str) -> Dict[str, Any]:
     asset_type_lower = asset_type.lower()
     if asset_type_lower == "stock":
@@ -36,7 +50,7 @@ def get_market_snapshot() -> Dict[str, Any]:
     for a in assets:
         symbol = a.get("name")
         asset_type = a.get("type", "Stock")
-        if not symbol:
+        if not symbol or not _looks_like_symbol(str(symbol)):
             continue
         key = (symbol, asset_type)
         if key in seen:
