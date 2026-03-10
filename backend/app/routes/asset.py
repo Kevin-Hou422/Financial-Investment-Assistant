@@ -8,16 +8,23 @@ from app.utils.helpers import validate_asset_data
 router = APIRouter()
 
 @router.get("/api/assets", response_model=List[Asset])
-def get_assets(type: Optional[str] = Query(None)):
+def get_assets(
+    type: Optional[str] = Query(None, description="Asset type filter"),
+    exchange: Optional[str] = Query(None, description="Exchange/category filter"),
+):
     assets = load_assets()
     if type:
-        assets = [a for a in assets if a["type"] == type]
+        assets = [a for a in assets if a.get("type") == type]
+    if exchange:
+        assets = [a for a in assets if a.get("exchange") == exchange]
     return assets
 
 @router.post("/api/assets", response_model=Asset)
 def create_asset(asset_in: AssetCreate):
     data = asset_in.dict()
     data["buy_date"] = str(data["buy_date"])
+    if data.get("exchange") is None:
+        data["exchange"] = ""
     if not validate_asset_data(data):
         raise HTTPException(status_code=400, detail="Invalid asset data")
     
@@ -38,6 +45,8 @@ def update_asset(asset_id: str, asset_in: AssetCreate):
             updated = asset_in.dict()
             updated["buy_date"] = str(updated["buy_date"])
             updated["id"] = asset_id
+            if updated.get("exchange") is None:
+                updated["exchange"] = ""
             updated["total_value"] = round(updated["quantity"] * updated["price"], 2)
             assets[i] = updated
             save_assets(assets)

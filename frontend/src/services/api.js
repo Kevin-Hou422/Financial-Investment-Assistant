@@ -6,7 +6,13 @@ const api = axios.create({
   baseURL: import.meta?.env?.VITE_API_BASE_URL || '/api',
 });
 
-export const getAssets = (type = '') => api.get(`/assets${type ? `?type=${type}` : ''}`);
+export const getAssets = (params = {}) => {
+  const q = new URLSearchParams();
+  if (params.type) q.set('type', params.type);
+  if (params.exchange) q.set('exchange', params.exchange);
+  const query = q.toString();
+  return api.get(`/assets${query ? `?${query}` : ''}`);
+};
 export const createAsset = (data) => api.post('/assets', data);
 export const updateAsset = (id, data) => api.put(`/assets/${id}`, data);
 export const deleteAsset = (id) => api.delete(`/assets/${id}`);

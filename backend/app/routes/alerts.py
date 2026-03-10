@@ -14,17 +14,19 @@ import uuid
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 
 
-def _fetch_price(symbol: str, asset_type: str) -> float | None:
-  asset_type = asset_type.lower()
-  if asset_type == "crypto":
-    data = fetch_crypto_price(symbol)
-  elif asset_type == "fund":
-    data = fetch_fund_price(symbol)
-  elif asset_type == "gold":
-    data = fetch_gold_price(symbol)
-  else:
-    data = fetch_stock_price(symbol, asset_type="stock")
-  return data.get("price")
+def _fetch_price(symbol: str, asset_type: str, exchange: str = "") -> float | None:
+    asset_type = asset_type.lower()
+    if asset_type == "crypto":
+        data = fetch_crypto_price(symbol)
+    elif asset_type == "fund":
+        data = fetch_fund_price(symbol)
+    elif asset_type == "gold":
+        data = fetch_gold_price(symbol)
+    else:
+        data = fetch_stock_price(
+            symbol, asset_type="stock", exchange=exchange or None
+        )
+    return data.get("price")
 
 
 @router.get("", response_model=List[dict])
@@ -58,6 +60,7 @@ def create_alert(alert_in: dict) -> dict:
         "id": str(uuid.uuid4()),
         "symbol": symbol,
         "asset_type": alert_in.get("asset_type", "Stock"),
+        "exchange": alert_in.get("exchange", ""),
         "direction": direction,
         "target_price": target_price,
     }
@@ -87,7 +90,11 @@ def check_alerts() -> List[dict]:
     alerts = load_alerts()
     triggered: List[dict] = []
     for a in alerts:
-        price = _fetch_price(a["symbol"], a.get("asset_type", "Stock"))
+        price = _fetch_price(
+            a["symbol"],
+            a.get("asset_type", "Stock"),
+            a.get("exchange", ""),
+        )
         if price is None:
             continue
         if a["direction"] == "above" and price >= a["target_price"]:

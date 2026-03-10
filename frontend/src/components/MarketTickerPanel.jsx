@@ -8,9 +8,16 @@ const ASSET_TYPES = [
   { value: 'gold', label: 'Gold' },
 ];
 
+const STOCK_EXCHANGES = [
+  { value: 'US', label: 'US' },
+  { value: 'HK', label: 'HK' },
+  { value: 'AShare', label: 'A-Share' },
+];
+
 export default function MarketTickerPanel() {
   const [symbol, setSymbol] = useState('AAPL');
   const [assetType, setAssetType] = useState('stock');
+  const [exchange, setExchange] = useState('US');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,7 +28,8 @@ export default function MarketTickerPanel() {
     try {
       setLoading(true);
       setError('');
-      const res = await marketService.getPrice(symbol.trim(), assetType);
+      const ex = assetType === 'stock' ? exchange : null;
+      const res = await marketService.getPrice(symbol.trim(), assetType, ex);
       setData(res);
     } catch (e) {
       setError('Failed to fetch market data');
@@ -39,7 +47,7 @@ export default function MarketTickerPanel() {
     if (!autoRefresh) return;
     const id = setInterval(fetchPrice, 30_000);
     return () => clearInterval(id);
-  }, [autoRefresh, symbol, assetType]);
+  }, [autoRefresh, symbol, assetType, exchange]);
 
   const changePct =
     data && data.change_pct != null ? `${data.change_pct.toFixed(2)}%` : '--';
@@ -64,6 +72,19 @@ export default function MarketTickerPanel() {
             </option>
           ))}
         </select>
+        {assetType === 'stock' && (
+          <select
+            className="border p-2 rounded outline-none"
+            value={exchange}
+            onChange={(e) => setExchange(e.target.value)}
+          >
+            {STOCK_EXCHANGES.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           type="button"
           onClick={fetchPrice}

@@ -18,11 +18,14 @@ def _resolve_price_for_asset(asset: Dict[str, Any]) -> Tuple[float, float]:
 
     asset_type = str(asset.get("type", "Stock")).lower()
     symbol = asset.get("name")
+    exchange = asset.get("exchange") or ""
 
     current_price = buy_price
     if symbol:
         if asset_type == "stock":
-            quote = fetch_stock_price(symbol, asset_type="stock")
+            quote = fetch_stock_price(
+                symbol, asset_type="stock", exchange=exchange
+            )
         elif asset_type == "fund":
             quote = fetch_fund_price(symbol)
         elif asset_type == "crypto":

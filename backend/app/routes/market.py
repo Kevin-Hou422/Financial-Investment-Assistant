@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException, Query
 
 from app.external.crypto_api import fetch_crypto_price
@@ -15,17 +17,22 @@ async def get_market_price(
     symbol: str,
     asset_type: str = Query(
         "stock",
-        description="资产类型：stock/fund/crypto/gold",
+        description="Asset type: stock/fund/crypto/gold",
         regex="^(stock|fund|crypto|gold)$",
+    ),
+    exchange: Optional[str] = Query(
+        None,
+        description="For stock: US, HK, AShare. Used to build correct ticker.",
     ),
 ):
     """
-    获取单一资产的当前行情（价格、涨跌幅、时间戳等）。
-
-    会根据 asset_type 分发到不同 external 模块，便于按资产类型扩展实现。
+    Get current quote (price, change, timestamp). For stocks, exchange
+    selects market (US / HK / AShare) and maps to the right API symbol.
     """
     if asset_type == "stock":
-        return fetch_stock_price(symbol=symbol, asset_type=asset_type)
+        return fetch_stock_price(
+            symbol=symbol, asset_type=asset_type, exchange=exchange
+        )
     if asset_type == "fund":
         return fetch_fund_price(symbol=symbol)
     if asset_type == "crypto":

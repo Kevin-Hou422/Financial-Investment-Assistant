@@ -1,141 +1,34 @@
 {
-  "updated_at": "2026-03-09T17:34:47.252029+00:00",
+  "updated_at": "2026-03-10T05:28:37.080625+00:00",
   "market": {
-    "as_of": "2026-03-09T17:34:48.154204+00:00",
-    "quotes": [
-      {
-        "symbol": "asjfej",
-        "asset_type": "crypto",
-        "price": null,
-        "previous_close": null,
-        "change_pct": null,
-        "timestamp": "2026-03-09T17:34:48.051401+00:00",
-        "error": "'currentTradingPeriod'"
-      },
-      {
-        "symbol": "TEST",
-        "asset_type": "stock",
-        "price": 45.72999954223633,
-        "previous_close": 46.4665,
-        "change_pct": -1.5850138438739205,
-        "timestamp": "2026-03-09T17:34:48.154204+00:00",
-        "error": null
-      }
-    ]
+    "as_of": "2026-03-10T05:28:37.082691+00:00",
+    "quotes": []
   },
   "portfolio": {
-    "assets": [
-      {
-        "name": "asjfej",
-        "type": "Crypto",
-        "quantity": 2000.0,
-        "price": 3.0,
-        "buy_date": "2026-02-25",
-        "id": "41700100-7e01-418c-9258-3bb05e20471d",
-        "total_value": 6000.0
-      },
-      {
-        "name": "谷歌",
-        "type": "Stock",
-        "quantity": 100000.0,
-        "price": 1.98,
-        "buy_date": "2026-03-04",
-        "id": "2c15a3aa-3d75-4cce-af71-c51aef87425d",
-        "total_value": 198000.0
-      },
-      {
-        "name": "微软",
-        "type": "Stock",
-        "quantity": 1000.0,
-        "price": 5.0,
-        "buy_date": "2026-02-24",
-        "id": "f0431cbc-5fa3-486a-a7a7-f5b19951fbc3",
-        "total_value": 5000.0
-      },
-      {
-        "name": "TEST",
-        "type": "Stock",
-        "quantity": 1.0,
-        "price": 1.23,
-        "buy_date": "2026-03-01",
-        "id": "56c854dd-8635-4fcb-9f16-8f716e366e97",
-        "total_value": 1.23
-      }
-    ],
+    "assets": [],
     "overview": {
-      "total_cost": 209001.23,
-      "total_current_value": 209045.73,
-      "pnl_amount": 44.5,
-      "pnl_pct": 0.02
+      "total_cost": 0.0,
+      "total_current_value": 0.0,
+      "pnl_amount": 0.0,
+      "pnl_pct": 0.0
     },
     "allocation": {
-      "total_value": 209001.23,
-      "type_allocation": [
-        {
-          "type": "Crypto",
-          "value": 6000.0,
-          "weight_pct": 2.87
-        },
-        {
-          "type": "Stock",
-          "value": 203001.23,
-          "weight_pct": 97.13
-        }
-      ],
-      "asset_allocation": [
-        {
-          "id": "41700100-7e01-418c-9258-3bb05e20471d",
-          "name": "asjfej",
-          "type": "Crypto",
-          "value": 6000.0,
-          "weight_pct": 2.87
-        },
-        {
-          "id": "2c15a3aa-3d75-4cce-af71-c51aef87425d",
-          "name": "谷歌",
-          "type": "Stock",
-          "value": 198000.0,
-          "weight_pct": 94.74
-        },
-        {
-          "id": "f0431cbc-5fa3-486a-a7a7-f5b19951fbc3",
-          "name": "微软",
-          "type": "Stock",
-          "value": 5000.0,
-          "weight_pct": 2.39
-        },
-        {
-          "id": "56c854dd-8635-4fcb-9f16-8f716e366e97",
-          "name": "TEST",
-          "type": "Stock",
-          "value": 1.23,
-          "weight_pct": 0.0
-        }
-      ],
+      "total_value": 0.0,
+      "type_allocation": [],
+      "asset_allocation": [],
       "concentration": {
-        "top1_weight_pct": 94.74,
-        "top3_weight_pct": 100.0,
-        "hhi": 0.899
+        "top1_weight_pct": 0.0,
+        "top3_weight_pct": 0.0,
+        "hhi": 0.0
       }
     }
   },
   "risk": {
-    "volatility": 17.57,
-    "max_drawdown": 43.92,
-    "std_dev": 17.57,
-    "risk_score": 3,
-    "risk_level": "Medium",
-    "allocation_snapshot": [
-      {
-        "type": "Crypto",
-        "value": 6000.0,
-        "weight_pct": 2.87
-      },
-      {
-        "type": "Stock",
-        "value": 203001.23,
-        "weight_pct": 97.13
-      }
-    ]
+    "volatility": 0.0,
+    "max_drawdown": 0.0,
+    "std_dev": 0.0,
+    "risk_score": 1,
+    "risk_level": "Very Low",
+    "allocation_snapshot": []
   }
 }

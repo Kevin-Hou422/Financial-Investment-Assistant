@@ -7,6 +7,7 @@ export default function AlertsPage() {
   const [form, setForm] = useState({
     symbol: '',
     asset_type: 'Stock',
+    exchange: 'US',
     direction: 'above',
     target_price: '',
   });
@@ -36,6 +37,7 @@ export default function AlertsPage() {
       setForm({
         symbol: '',
         asset_type: 'Stock',
+        exchange: 'US',
         direction: 'above',
         target_price: '',
       });
@@ -69,7 +71,7 @@ export default function AlertsPage() {
         className="bg-white p-4 rounded-lg shadow-sm border flex flex-col gap-3"
       >
         <h3 className="text-lg font-bold">Price Alerts</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <input
             required
             placeholder="Symbol"
@@ -90,6 +92,17 @@ export default function AlertsPage() {
               ),
             )}
           </select>
+          {form.asset_type === 'Stock' && (
+            <select
+              className="border p-2 rounded outline-none"
+              value={form.exchange}
+              onChange={(e) => setForm({ ...form, exchange: e.target.value })}
+            >
+              <option value="US">US</option>
+              <option value="HK">HK</option>
+              <option value="AShare">A-Share</option>
+            </select>
+          )}
           <select
             className="border p-2 rounded outline-none"
             value={form.direction}
@@ -144,6 +157,9 @@ export default function AlertsPage() {
                 Type
               </th>
               <th className="p-2 text-xs font-semibold text-gray-600">
+                Exchange
+              </th>
+              <th className="p-2 text-xs font-semibold text-gray-600">
                 Direction
               </th>
               <th className="p-2 text-xs font-semibold text-gray-600">
@@ -159,6 +175,7 @@ export default function AlertsPage() {
               <tr key={a.id} className="border-b">
                 <td className="p-2 text-sm font-semibold">{a.symbol}</td>
                 <td className="p-2 text-sm">{a.asset_type}</td>
+                <td className="p-2 text-sm">{a.exchange || '-'}</td>
                 <td className="p-2 text-sm capitalize">{a.direction}</td>
                 <td className="p-2 text-sm">{a.target_price}</td>
                 <td className="p-2 text-right">
@@ -175,7 +192,7 @@ export default function AlertsPage() {
             {alerts.length === 0 && (
               <tr>
                 <td
-                  colSpan="5"
+                  colSpan="6"
                   className="p-4 text-center text-sm text-gray-500"
                 >
                   No alerts yet.

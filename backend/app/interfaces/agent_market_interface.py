@@ -22,10 +22,14 @@ def _looks_like_symbol(value: str) -> bool:
     return all(ch in allowed for ch in value)
 
 
-def _fetch_for_asset_type(symbol: str, asset_type: str) -> Dict[str, Any]:
+def _fetch_for_asset_type(
+    symbol: str, asset_type: str, exchange: str = ""
+) -> Dict[str, Any]:
     asset_type_lower = asset_type.lower()
     if asset_type_lower == "stock":
-        return fetch_stock_price(symbol, asset_type="stock")
+        return fetch_stock_price(
+            symbol, asset_type="stock", exchange=exchange or None
+        )
     if asset_type_lower == "fund":
         return fetch_fund_price(symbol)
     if asset_type_lower == "crypto":
@@ -44,19 +48,20 @@ def get_market_snapshot() -> Dict[str, Any]:
     - 仅做数据汇总，不包含信号或策略判断
     """
     assets = load_assets()
-    seen: set[tuple[str, str]] = set()
+    seen: set[tuple[str, str, str]] = set()
     quotes: List[Dict[str, Any]] = []
 
     for a in assets:
         symbol = a.get("name")
         asset_type = a.get("type", "Stock")
+        exchange = (a.get("exchange") or "").strip()
         if not symbol or not _looks_like_symbol(str(symbol)):
             continue
-        key = (symbol, asset_type)
+        key = (symbol, asset_type, exchange)
         if key in seen:
             continue
         seen.add(key)
-        quote = _fetch_for_asset_type(symbol, asset_type)
+        quote = _fetch_for_asset_type(symbol, asset_type, exchange)
         quotes.append(quote)
 
     return {

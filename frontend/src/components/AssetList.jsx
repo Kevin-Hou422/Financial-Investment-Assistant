@@ -2,15 +2,24 @@ import { useState, useEffect } from 'react';
 import { getAssets, deleteAsset, createAsset, updateAsset } from '../services/api';
 import AssetForm from './AssetForm';
 import { formatCurrency } from '../utils/helpers';
+import { ASSET_TYPES, ASSET_TYPE_CATEGORIES } from '../utils/assetCategories';
 
-export default function AssetList({ defaultType }) {
+export default function AssetList() {
   const [assets, setAssets] = useState([]);
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState(defaultType || '');
+  const [filterType, setFilterType] = useState('');
+  const [filterExchange, setFilterExchange] = useState('');
   const [editingAsset, setEditingAsset] = useState(null);
 
-  const loadAssets = () => getAssets().then(res => setAssets(res.data));
-  useEffect(() => { loadAssets(); }, []);
+  const loadAssets = () => {
+    const params = {};
+    if (filterType) params.type = filterType;
+    if (filterExchange) params.exchange = filterExchange;
+    return getAssets(params).then((res) => setAssets(res.data));
+  };
+  useEffect(() => {
+    loadAssets();
+  }, [filterType, filterExchange]);
 
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this asset?')) return;
@@ -46,25 +55,47 @@ export default function AssetList({ defaultType }) {
   };
 
   const filteredAssets = assets
-    .filter(a => a.name.toLowerCase().includes(search.toLowerCase()))
-    .filter(a => filterType ? a.type === filterType : true)
-    .sort((a, b) => new Date(b.buy_date) - new Date(a.buy_date)); // Sort by Date desc
+    .filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => new Date(b.buy_date) - new Date(a.buy_date));
 
   return (
     <div className="space-y-6">
       <AssetForm onSave={handleSave} initialData={editingAsset} onCancel={() => setEditingAsset(null)} />
 
       <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <input placeholder="Search by name..." className="border p-2 rounded flex-1 outline-none focus:border-blue-500" value={search} onChange={e => setSearch(e.target.value)} />
+        <h3 className="text-lg font-bold mb-4">Assets by Type & Category</h3>
+        <div className="flex flex-col md:flex-row gap-4 mb-6 flex-wrap">
+          <input
+            placeholder="Search by name..."
+            className="border p-2 rounded flex-1 min-w-[180px] outline-none focus:border-indigo-500"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
           <select
-            className="border p-2 rounded outline-none"
+            className="border p-2 rounded outline-none min-w-[140px]"
             value={filterType}
-            onChange={e => setFilterType(e.target.value)}
+            onChange={(e) => {
+              setFilterType(e.target.value);
+              setFilterExchange('');
+            }}
           >
             <option value="">All Types</option>
-            {['Stock', 'Fund', 'Crypto', 'Gold', 'Bond', 'Forex', 'Custom'].map(t => (
-              <option key={t} value={t}>{t}</option>
+            {ASSET_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          <select
+            className="border p-2 rounded outline-none min-w-[160px]"
+            value={filterExchange}
+            onChange={(e) => setFilterExchange(e.target.value)}
+          >
+            <option value="">All Categories</option>
+            {(ASSET_TYPE_CATEGORIES[filterType] || []).map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
             ))}
           </select>
         </div>
@@ -75,6 +106,7 @@ export default function AssetList({ defaultType }) {
                 <tr className="bg-gray-50 border-b">
                 <th className="p-3 text-sm font-semibold text-gray-600">Name</th>
                 <th className="p-3 text-sm font-semibold text-gray-600">Type</th>
+                <th className="p-3 text-sm font-semibold text-gray-600">Category</th>
                 <th className="p-3 text-sm font-semibold text-gray-600">Quantity</th>
                 <th className="p-3 text-sm font-semibold text-gray-600">Buy Price</th>
                 <th className="p-3 text-sm font-semibold text-gray-600">Total Value</th>
@@ -86,7 +118,8 @@ export default function AssetList({ defaultType }) {
                 {filteredAssets.length > 0 ? filteredAssets.map(a => (
                 <tr key={a.id} className="border-b hover:bg-gray-50 transition-colors">
                     <td className="p-3 font-medium">{a.name}</td>
-                    <td className="p-3"><span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">{a.type}</span></td>
+                    <td className="p-3"><span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded">{a.type}</span></td>
+                    <td className="p-3 text-sm text-slate-600">{a.exchange || '-'}</td>
                     <td className="p-3">{a.quantity}</td>
                     <td className="p-3">{formatCurrency(a.price)}</td>
                     <td className="p-3 font-semibold text-gray-700">{formatCurrency(a.total_value)}</td>
@@ -97,7 +130,7 @@ export default function AssetList({ defaultType }) {
                     </td>
                 </tr>
                 )) : (
-                    <tr><td colSpan="7" className="p-6 text-center text-gray-500">No assets found.</td></tr>
+                    <tr><td colSpan="8" className="p-6 text-center text-gray-500">No assets found.</td></tr>
                 )}
             </tbody>
             </table>
