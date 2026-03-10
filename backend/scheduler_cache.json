@@ -1,34 +1,74 @@
 {
-  "updated_at": "2026-03-10T05:28:37.080625+00:00",
+  "updated_at": "2026-03-10T06:48:59.720020+00:00",
   "market": {
-    "as_of": "2026-03-10T05:28:37.082691+00:00",
-    "quotes": []
+    "as_of": "2026-03-10T06:49:29.987256+00:00",
+    "quotes": [
+      {
+        "symbol": "APPL",
+        "asset_type": "stock",
+        "price": null,
+        "previous_close": null,
+        "change_pct": null,
+        "timestamp": "2026-03-10T06:49:29.987256+00:00",
+        "error": null
+      }
+    ]
   },
   "portfolio": {
-    "assets": [],
+    "assets": [
+      {
+        "name": "APPL",
+        "type": "Stock",
+        "quantity": 1000.0,
+        "price": 5.0,
+        "buy_date": "2026-03-03",
+        "id": "2de2fd65-c57a-42e3-8863-4d3d4aa3fe08",
+        "total_value": 5000.0
+      }
+    ],
     "overview": {
-      "total_cost": 0.0,
-      "total_current_value": 0.0,
+      "total_cost": 5000.0,
+      "total_current_value": 5000.0,
       "pnl_amount": 0.0,
       "pnl_pct": 0.0
     },
     "allocation": {
-      "total_value": 0.0,
-      "type_allocation": [],
-      "asset_allocation": [],
+      "total_value": 5000.0,
+      "type_allocation": [
+        {
+          "type": "Stock",
+          "value": 5000.0,
+          "weight_pct": 100.0
+        }
+      ],
+      "asset_allocation": [
+        {
+          "id": "2de2fd65-c57a-42e3-8863-4d3d4aa3fe08",
+          "name": "APPL",
+          "type": "Stock",
+          "value": 5000.0,
+          "weight_pct": 100.0
+        }
+      ],
       "concentration": {
-        "top1_weight_pct": 0.0,
-        "top3_weight_pct": 0.0,
-        "hhi": 0.0
+        "top1_weight_pct": 100.0,
+        "top3_weight_pct": 100.0,
+        "hhi": 1.0
       }
     }
   },
   "risk": {
-    "volatility": 0.0,
-    "max_drawdown": 0.0,
-    "std_dev": 0.0,
-    "risk_score": 1,
-    "risk_level": "Very Low",
-    "allocation_snapshot": []
+    "volatility": 18.0,
+    "max_drawdown": 45.0,
+    "std_dev": 18.0,
+    "risk_score": 3,
+    "risk_level": "Medium",
+    "allocation_snapshot": [
+      {
+        "type": "Stock",
+        "value": 5000.0,
+        "weight_pct": 100.0
+      }
+    ]
   }
 }
