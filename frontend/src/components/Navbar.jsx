@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const NAV_ITEMS = [
   {
@@ -92,6 +93,7 @@ const NAV_ITEMS = [
 
 export default function Navbar() {
   const location = useLocation();
+  const { user, logout } = useAuth();
 
   const isActive = (item) => {
     if (item.exact) return location.pathname === item.path;
@@ -133,6 +135,29 @@ export default function Navbar() {
               <span>{item.label}</span>
             </Link>
           ))}
+        </div>
+
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-2 bg-gray-800 border border-gray-700 rounded-xl px-3 py-1.5">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center text-white text-xs font-black flex-shrink-0">
+              {user?.avatar || user?.name?.[0]?.toUpperCase() || 'U'}
+            </div>
+            <span className="text-xs text-gray-300 font-medium max-w-[100px] truncate hidden sm:block">
+              {user?.name || user?.email || 'User'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={logout}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg text-gray-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-200"
+            title="Sign out"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            <span className="hidden sm:block">Logout</span>
+          </button>
         </div>
       </div>
     </nav>

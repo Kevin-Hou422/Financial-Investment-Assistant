@@ -1,4 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import AuthPage from './components/AuthPage';
 import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
 import AssetSectorPage from './components/AssetSectorPage';
@@ -9,7 +11,11 @@ import WatchlistPage from './components/WatchlistPage';
 import AlertsPage from './components/AlertsPage';
 import NewsPage from './components/NewsPage';
 
-function App() {
+function AppInner() {
+  const { user } = useAuth();
+
+  if (!user) return <AuthPage />;
+
   return (
     <Router>
       <div className="min-h-screen bg-gray-950 text-gray-100 font-sans">
@@ -30,4 +36,13 @@ function App() {
     </Router>
   );
 }
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  );
+}
+
 export default App;
