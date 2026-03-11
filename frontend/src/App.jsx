@@ -1,7 +1,8 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
-import AssetList from './components/AssetList';
+import AssetSectorPage from './components/AssetSectorPage';
+import AssetCategoryPage from './components/AssetCategoryPage';
 import CashflowTable from './components/CashflowTable';
 import PlanManager from './components/PlanManager';
 import WatchlistPage from './components/WatchlistPage';
@@ -11,12 +12,13 @@ import NewsPage from './components/NewsPage';
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
+      <div className="min-h-screen bg-gray-950 text-gray-100 font-sans">
         <Navbar />
-        <div className="container mx-auto p-6">
+        <div className="max-w-7xl mx-auto px-4 py-6">
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/assets" element={<AssetList />} />
+            <Route path="/assets" element={<AssetSectorPage />} />
+            <Route path="/assets/:type" element={<AssetCategoryPage />} />
             <Route path="/cashflows" element={<CashflowTable />} />
             <Route path="/plans" element={<PlanManager />} />
             <Route path="/watchlist" element={<WatchlistPage />} />

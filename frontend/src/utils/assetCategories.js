@@ -1,7 +1,3 @@
-/**
- * Asset type -> sub-category (exchange) options.
- * Used for filtering and form dropdowns.
- */
 export const ASSET_TYPE_CATEGORIES = {
   Stock: [
     { value: 'US', label: 'US Stocks' },
@@ -34,3 +30,83 @@ export const ASSET_TYPES = [
   'Forex',
   'Custom',
 ];
+
+export const SECTOR_CONFIG = {
+  Stock: {
+    gradient: 'from-violet-600 to-purple-800',
+    glow: 'shadow-violet-500/30',
+    accent: 'text-violet-400',
+    border: 'border-violet-500',
+    badge: 'bg-violet-500/20 text-violet-300',
+    btn: 'bg-violet-600 hover:bg-violet-700',
+    tab: 'bg-violet-600',
+    desc: 'US · HK · A-Share equities',
+    icon: 'stock',
+  },
+  Fund: {
+    gradient: 'from-cyan-500 to-blue-700',
+    glow: 'shadow-cyan-500/30',
+    accent: 'text-cyan-400',
+    border: 'border-cyan-500',
+    badge: 'bg-cyan-500/20 text-cyan-300',
+    btn: 'bg-cyan-600 hover:bg-cyan-700',
+    tab: 'bg-cyan-600',
+    desc: 'Domestic & international funds',
+    icon: 'fund',
+  },
+  Crypto: {
+    gradient: 'from-orange-500 to-red-700',
+    glow: 'shadow-orange-500/30',
+    accent: 'text-orange-400',
+    border: 'border-orange-500',
+    badge: 'bg-orange-500/20 text-orange-300',
+    btn: 'bg-orange-600 hover:bg-orange-700',
+    tab: 'bg-orange-600',
+    desc: 'Spot cryptocurrency assets',
+    icon: 'crypto',
+  },
+  Gold: {
+    gradient: 'from-yellow-400 to-amber-600',
+    glow: 'shadow-yellow-500/30',
+    accent: 'text-yellow-400',
+    border: 'border-yellow-500',
+    badge: 'bg-yellow-500/20 text-yellow-300',
+    btn: 'bg-yellow-500 hover:bg-yellow-600',
+    tab: 'bg-yellow-500',
+    desc: 'Precious metals & commodities',
+    icon: 'gold',
+  },
+  Bond: {
+    gradient: 'from-blue-500 to-indigo-700',
+    glow: 'shadow-blue-500/30',
+    accent: 'text-blue-400',
+    border: 'border-blue-500',
+    badge: 'bg-blue-500/20 text-blue-300',
+    btn: 'bg-blue-600 hover:bg-blue-700',
+    tab: 'bg-blue-600',
+    desc: 'Government & corporate bonds',
+    icon: 'bond',
+  },
+  Forex: {
+    gradient: 'from-emerald-500 to-green-700',
+    glow: 'shadow-emerald-500/30',
+    accent: 'text-emerald-400',
+    border: 'border-emerald-500',
+    badge: 'bg-emerald-500/20 text-emerald-300',
+    btn: 'bg-emerald-600 hover:bg-emerald-700',
+    tab: 'bg-emerald-600',
+    desc: 'Major & cross currency pairs',
+    icon: 'forex',
+  },
+  Custom: {
+    gradient: 'from-pink-500 to-rose-700',
+    glow: 'shadow-pink-500/30',
+    accent: 'text-pink-400',
+    border: 'border-pink-500',
+    badge: 'bg-pink-500/20 text-pink-300',
+    btn: 'bg-pink-600 hover:bg-pink-700',
+    tab: 'bg-pink-600',
+    desc: 'Other custom asset classes',
+    icon: 'custom',
+  },
+};

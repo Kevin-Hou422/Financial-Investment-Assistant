@@ -1,15 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { getAssets } from '../services/api';
 import { formatCurrency } from '../utils/helpers';
@@ -22,52 +13,48 @@ import NotificationPanel from './NotificationPanel';
 import ReportExportPanel from './ReportExportPanel';
 import AnalyticsPanel from './AnalyticsPanel';
 
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#6366F1'];
+const COLORS = ['#8B5CF6', '#06B6D4', '#F97316', '#F59E0B', '#3B82F6', '#10B981', '#EC4899'];
+
+const cardCls = 'bg-gray-800 border border-gray-700 rounded-2xl p-6';
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm shadow-xl">
+        <p className="text-gray-400 text-xs mb-1">{label || payload[0].name}</p>
+        <p className="text-white font-bold">{formatCurrency(payload[0].value)}</p>
+      </div>
+    );
+  }
+  return null;
+};
 
 export default function Dashboard() {
   const [assets, setAssets] = useState([]);
-  const [overview, setOverview] = useState({
-    total_cost: 0,
-    total_current_value: 0,
-    pnl_amount: 0,
-    pnl_pct: 0,
-  });
-  const [risk, setRisk] = useState({
-    volatility: 0,
-    max_drawdown: 0,
-  });
+  const [overview, setOverview] = useState({ total_cost: 0, total_current_value: 0, pnl_amount: 0, pnl_pct: 0 });
+  const [risk, setRisk] = useState({ volatility: 0, max_drawdown: 0 });
+
+  useEffect(() => { getAssets().then((res) => setAssets(res.data)); }, []);
 
   useEffect(() => {
-    getAssets().then((res) => setAssets(res.data));
-  }, []);
-
-  useEffect(() => {
-    // 懒加载 portfolio 概览，避免修改现有 api.js 导出结构
-    const loadOverview = async () => {
+    const load = async () => {
       try {
         const { default: api } = await import('../services/api');
         const res = await api.get('/portfolio/summary');
         setOverview(res.data);
-      } catch (e) {
-        // 在 Dashboard 上静默失败，避免打断主流程
-      }
+      } catch {}
     };
-    loadOverview();
+    load();
   }, []);
 
   useEffect(() => {
-    const loadRisk = async () => {
+    const load = async () => {
       try {
         const data = await riskService.getMetrics();
-        setRisk({
-          volatility: data.volatility || 0,
-          max_drawdown: data.max_drawdown || 0,
-        });
-      } catch (e) {
-        // 风险接口失败时不阻塞 Dashboard 其他内容
-      }
+        setRisk({ volatility: data.volatility || 0, max_drawdown: data.max_drawdown || 0 });
+      } catch {}
     };
-    loadRisk();
+    load();
   }, []);
 
   const typeData = assets.reduce((acc, curr) => {
@@ -77,41 +64,39 @@ export default function Dashboard() {
     return acc;
   }, []);
 
+  const pnlColor = overview.pnl_amount > 0 ? 'text-emerald-400' : overview.pnl_amount < 0 ? 'text-rose-400' : 'text-gray-300';
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow-sm border flex flex-col items-center justify-center">
-          <h2 className="text-sm font-semibold text-gray-500">
-            Total Cost
-          </h2>
-          <p className="text-2xl md:text-3xl font-bold text-gray-800 mt-1">
-            {formatCurrency(overview.total_cost)}
-          </p>
+        <div className={`${cardCls} flex flex-col items-center justify-center`}>
+          <div className="flex items-center gap-2 mb-1">
+            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Cost</h2>
+          </div>
+          <p className="text-2xl md:text-3xl font-black text-white">{formatCurrency(overview.total_cost)}</p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm border flex flex-col items-center justify-center">
-          <h2 className="text-sm font-semibold text-gray-500">
-            Current Value
-          </h2>
-          <p className="text-2xl md:text-3xl font-bold text-blue-600 mt-1">
-            {formatCurrency(overview.total_current_value)}
-          </p>
+        <div className={`${cardCls} flex flex-col items-center justify-center border-indigo-500/30`}>
+          <div className="flex items-center gap-2 mb-1">
+            <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <h2 className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">Current Value</h2>
+          </div>
+          <p className="text-2xl md:text-3xl font-black text-indigo-400">{formatCurrency(overview.total_current_value)}</p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm border flex flex-col items-center justify-center">
-          <h2 className="text-sm font-semibold text-gray-500">
-            P&amp;L / Return
-          </h2>
-          <p
-            className={`text-2xl md:text-3xl font-bold mt-1 ${
-              overview.pnl_amount > 0
-                ? 'text-green-600'
-                : overview.pnl_amount < 0
-                ? 'text-red-600'
-                : 'text-gray-700'
-            }`}
-          >
-            {formatCurrency(overview.pnl_amount)} (
-            {overview.pnl_pct.toFixed(2)}
-            %)
+        <div className={`${cardCls} flex flex-col items-center justify-center`}>
+          <div className="flex items-center gap-2 mb-1">
+            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">P&L / Return</h2>
+          </div>
+          <p className={`text-2xl md:text-3xl font-black ${pnlColor}`}>
+            {formatCurrency(overview.pnl_amount)}{' '}
+            <span className="text-lg">({overview.pnl_pct.toFixed(2)}%)</span>
           </p>
         </div>
       </div>
@@ -119,54 +104,48 @@ export default function Dashboard() {
       <MarketTickerPanel />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h3 className="text-lg font-bold mb-4">Risk Overview</h3>
-          <RiskAnalysisPanel
-            volatility={risk.volatility}
-            maxDrawdown={risk.max_drawdown}
-          />
+        <div className={cardCls}>
+          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+            <svg className="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            Risk Overview
+          </h3>
+          <RiskAnalysisPanel volatility={risk.volatility} maxDrawdown={risk.max_drawdown} />
         </div>
         <NotificationPanel />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h3 className="text-lg font-bold mb-6 text-center">Asset Allocation</h3>
-          <div className="h-72">
+        <div className={cardCls}>
+          <h3 className="text-base font-bold text-white mb-4 text-center">Asset Allocation</h3>
+          <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie
-                  data={typeData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  label
-                >
-                  {typeData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
+                <Pie data={typeData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label>
+                  {typeData.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => formatCurrency(value)} />
-                <Legend />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ color: '#9CA3AF', fontSize: 12 }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
         </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h3 className="text-lg font-bold mb-6 text-center">Value by Type</h3>
-          <div className="h-72">
+        <div className={cardCls}>
+          <h3 className="text-base font-bold text-white mb-4 text-center">Value by Type</h3>
+          <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={typeData}>
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip formatter={(value) => formatCurrency(value)} />
-                <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                <XAxis dataKey="name" stroke="#6B7280" tick={{ fill: '#9CA3AF', fontSize: 11 }} />
+                <YAxis stroke="#6B7280" tick={{ fill: '#9CA3AF', fontSize: 11 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                  {typeData.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -174,7 +153,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className={cardCls}>
           <PlaceholderChart />
         </div>
         <PortfolioConcentrationPanel />

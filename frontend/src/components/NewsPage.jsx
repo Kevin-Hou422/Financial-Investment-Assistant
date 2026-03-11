@@ -19,62 +19,72 @@ export default function NewsPage() {
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm border space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h3 className="text-lg font-bold">Market News</h3>
-          {isLive && (
-            <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-green-100 text-green-700 uppercase tracking-wide">
-              Live
-            </span>
-          )}
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-black text-white">Market News</h1>
+            {isLive && (
+              <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-400 uppercase tracking-wide border border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live
+              </span>
+            )}
+          </div>
+          <p className="text-gray-400 text-sm mt-1">Latest financial news from global markets</p>
         </div>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          className="px-3 py-1 text-xs rounded bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50"
-        >
+        <button type="button" onClick={load} disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:text-white text-sm font-medium transition-all disabled:opacity-50">
+          <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
           {loading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
-      <div className="space-y-3">
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {items.map((n) => (
-          <div key={n.id} className="border border-slate-100 rounded-lg p-3">
+          <div key={n.id}
+            className="bg-gray-800 border border-gray-700 rounded-2xl p-5 flex flex-col gap-3 hover:border-gray-600 hover:bg-gray-750 transition-all group">
+            <div className="flex items-start justify-between gap-2">
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 uppercase tracking-wide flex-shrink-0">
+                {n.source}
+              </span>
+              {n.url && (
+                <a href={n.url} target="_blank" rel="noopener noreferrer"
+                  className="text-gray-600 hover:text-orange-400 transition-colors flex-shrink-0">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              )}
+            </div>
             {n.url ? (
-              <a
-                href={n.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm font-semibold text-blue-700 hover:underline"
-              >
+              <a href={n.url} target="_blank" rel="noopener noreferrer"
+                className="text-white font-semibold text-sm leading-snug group-hover:text-orange-300 transition-colors line-clamp-3">
                 {n.headline}
               </a>
             ) : (
-              <p className="text-sm font-semibold text-slate-800">{n.headline}</p>
+              <p className="text-white font-semibold text-sm leading-snug line-clamp-3">{n.headline}</p>
             )}
             {n.summary && (
-              <p className="text-xs text-slate-600 mt-1">{n.summary}</p>
+              <p className="text-gray-400 text-xs leading-relaxed line-clamp-3">{n.summary}</p>
             )}
-            <div className="flex items-center gap-3 mt-2">
-              <p className="text-[10px] text-slate-400 uppercase tracking-wide">
-                {n.source}
-              </p>
-              {n.published_at && (
-                <p className="text-[10px] text-slate-400">{n.published_at}</p>
-              )}
-            </div>
+            {n.published_at && (
+              <p className="text-gray-600 text-xs mt-auto">{n.published_at}</p>
+            )}
           </div>
         ))}
-        {!loading && items.length === 0 && (
-          <p className="text-sm text-gray-500">No news available.</p>
-        )}
       </div>
+
+      {!loading && items.length === 0 && (
+        <div className="text-center text-gray-500 bg-gray-800 border border-gray-700 rounded-2xl p-10">
+          No news available. Try refreshing.
+        </div>
+      )}
     </div>
   );
 }
