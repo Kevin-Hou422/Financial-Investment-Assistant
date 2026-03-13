@@ -1,20 +1,19 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
-from app.db.database import load_assets
-from app.utils.analytics_engine import portfolio_analytics
-
+from app.db.session import get_db
+from app.db.asset_repo import list_assets
+from app.db.models import User
+from app.utils.auth_utils import get_current_user
+from app.utils.portfolio_engine import compute_analytics
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
 
-@router.get("/summary")
-def get_analytics_summary() -> dict:
-    """
-    Portfolio-level analytics:
-    - total_value
-    - naive value-weighted portfolio return
-    - per-asset value and return.
-    """
-    assets = load_assets()
-    return portfolio_analytics(assets)
-
+@router.get("")
+def get_analytics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    assets = list_assets(db, current_user.id)
+    return compute_analytics(assets)

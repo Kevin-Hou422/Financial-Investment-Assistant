@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Any, Dict, List, Tuple
 
 from app.external.crypto_api import fetch_crypto_price
@@ -71,5 +72,80 @@ def calculate_portfolio_overview(assets: List[Dict[str, Any]]) -> Dict[str, Any]
         "total_current_value": round(total_current, 2),
         "pnl_amount": round(pnl_amount, 2),
         "pnl_pct": round(pnl_pct, 2),
+    }
+
+
+# Alias used by new routes
+def compute_summary(assets: List[Dict[str, Any]]) -> Dict[str, Any]:
+    return calculate_portfolio_overview(assets)
+
+
+def compute_analysis(assets: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Concentration analysis: HHI, top-N weights."""
+    if not assets:
+        return {"concentration": {"top1_weight_pct": 0, "top3_weight_pct": 0, "hhi": 0}}
+    values = []
+    for a in assets:
+        _, cur = _resolve_price_for_asset(a)
+        values.append((a.get("name", ""), cur))
+    total = sum(v for _, v in values) or 1
+    weights = sorted([v / total for _, v in values], reverse=True)
+    hhi = sum(w ** 2 for w in weights)
+    top1 = weights[0] * 100 if weights else 0
+    top3 = sum(weights[:3]) * 100 if weights else 0
+    return {
+        "concentration": {
+            "top1_weight_pct": round(top1, 2),
+            "top3_weight_pct": round(top3, 2),
+            "hhi": round(hhi, 4),
+        }
+    }
+
+
+# Estimated volatility by asset type
+_VOL_BY_TYPE = {"stock": 15, "crypto": 60, "gold": 12, "fund": 10, "bond": 5, "forex": 8}
+
+
+def compute_risk_metrics(assets: List[Dict[str, Any]]) -> Dict[str, Any]:
+    if not assets:
+        return {"volatility": 0, "max_drawdown": 0}
+    type_values: Dict[str, float] = defaultdict(float)
+    for a in assets:
+        _, cur = _resolve_price_for_asset(a)
+        type_values[str(a.get("type", "stock")).lower()] += cur
+    total = sum(type_values.values()) or 1
+    weighted_vol = sum(
+        _VOL_BY_TYPE.get(t, 15) * (v / total) for t, v in type_values.items()
+    )
+    max_drawdown = round(weighted_vol * 0.6, 1)
+    return {
+        "volatility": round(weighted_vol, 1),
+        "max_drawdown": max_drawdown,
+    }
+
+
+def compute_analytics(assets: List[Dict[str, Any]]) -> Dict[str, Any]:
+    if not assets:
+        return {"total_value": 0, "portfolio_return_pct": 0, "assets": []}
+    rows = []
+    total_cost = 0.0
+    total_value = 0.0
+    for a in assets:
+        cost, cur = _resolve_price_for_asset(a)
+        ret_pct = ((cur - cost) / cost * 100) if cost else 0
+        total_cost += cost
+        total_value += cur
+        rows.append({
+            "id": a.get("id", ""),
+            "name": a.get("name", ""),
+            "type": a.get("type", ""),
+            "value": round(cur, 2),
+            "return_pct": round(ret_pct, 2),
+        })
+    portfolio_return_pct = ((total_value - total_cost) / total_cost * 100) if total_cost else 0
+    return {
+        "total_value": round(total_value, 2),
+        "portfolio_return_pct": round(portfolio_return_pct, 2),
+        "assets": rows,
     }
 

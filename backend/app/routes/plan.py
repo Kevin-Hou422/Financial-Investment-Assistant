@@ -1,53 +1,58 @@
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from fastapi import APIRouter, HTTPException
-
-from app.db.plan_repo import load_plans, save_plans
-from app.models.plan_model import Plan, PlanCreate
-
-import uuid
-
+from app.db.session import get_db
+from app.db.plan_repo import list_plans, create_plan, update_plan, delete_plan
+from app.db.models import User
+from app.utils.auth_utils import get_current_user
 
 router = APIRouter(prefix="/api/plans", tags=["plans"])
 
 
-@router.get("", response_model=List[Plan])
-def list_plans() -> List[Plan]:
-    return load_plans()
+class PlanInput(BaseModel):
+    name: str
+    target_amount: float
+    current_amount: float
+    deadline: str
 
 
-@router.post("", response_model=Plan)
-def create_plan(plan_in: PlanCreate) -> Plan:
-    data = plan_in.dict()
-    data["id"] = str(uuid.uuid4())
-    data["deadline"] = str(data["deadline"])
-
-    items = load_plans()
-    items.append(data)
-    save_plans(items)
-    return data
+@router.get("")
+def get_plans(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return list_plans(db, current_user.id)
 
 
-@router.put("/{plan_id}", response_model=Plan)
-def update_plan(plan_id: str, plan_in: PlanCreate) -> Plan:
-    items = load_plans()
-    for idx, p in enumerate(items):
-        if p["id"] == plan_id:
-            data = plan_in.dict()
-            data["id"] = plan_id
-            data["deadline"] = str(data["deadline"])
-            items[idx] = data
-            save_plans(items)
-            return data
-    raise HTTPException(status_code=404, detail="Plan not found")
+@router.post("")
+def add_plan(
+    data: PlanInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return create_plan(db, current_user.id, data.model_dump())
+
+
+@router.put("/{plan_id}")
+def edit_plan(
+    plan_id: str,
+    data: PlanInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = update_plan(db, current_user.id, plan_id, data.model_dump())
+    if not result:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    return result
 
 
 @router.delete("/{plan_id}")
-def delete_plan(plan_id: str):
-    items = load_plans()
-    filtered = [i for i in items if i["id"] != plan_id]
-    if len(filtered) == len(items):
+def remove_plan(
+    plan_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not delete_plan(db, current_user.id, plan_id):
         raise HTTPException(status_code=404, detail="Plan not found")
-    save_plans(filtered)
-    return {"message": "Deleted"}
-
+    return {"ok": True}

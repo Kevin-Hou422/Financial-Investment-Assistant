@@ -5,3 +5,9 @@ cors==1.0.1
 numpy
 yfinance
 feedparser
+sqlalchemy>=2.0
+python-jose[cryptography]
+passlib[bcrypt]
+httpx
+python-dotenv
+python-multipart

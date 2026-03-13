@@ -1,49 +1,45 @@
-from typing import List
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from fastapi import APIRouter, HTTPException
-
-from app.db.watchlist_repo import load_watchlist, save_watchlist
-
-import uuid
-
+from app.db.session import get_db
+from app.db.watchlist_repo import list_watchlist, create_watch_item, delete_watch_item
+from app.db.models import User
+from app.utils.auth_utils import get_current_user
 
 router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
 
 
-@router.get("", response_model=List[dict])
-def list_watchlist() -> List[dict]:
-    return load_watchlist()
+class WatchlistInput(BaseModel):
+    symbol: str
+    asset_type: Optional[str] = "Stock"
+    note: Optional[str] = ""
 
 
-@router.post("", response_model=dict)
-def add_watch_item(item: dict) -> dict:
-    """
-    Expected fields:
-    - symbol
-    - asset_type
-    - note (optional)
-    """
-    data = {
-        "id": str(uuid.uuid4()),
-        "symbol": item.get("symbol"),
-        "asset_type": item.get("asset_type", "Stock"),
-        "note": item.get("note"),
-    }
-    if not data["symbol"]:
-        raise HTTPException(status_code=400, detail="symbol is required")
+@router.get("")
+def get_watchlist(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return list_watchlist(db, current_user.id)
 
-    items = load_watchlist()
-    items.append(data)
-    save_watchlist(items)
-    return data
+
+@router.post("")
+def add_watchlist(
+    data: WatchlistInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return create_watch_item(db, current_user.id, data.model_dump())
 
 
 @router.delete("/{item_id}")
-def delete_watch_item(item_id: str):
-    items = load_watchlist()
-    filtered = [i for i in items if i["id"] != item_id]
-    if len(filtered) == len(items):
-        raise HTTPException(status_code=404, detail="Watch item not found")
-    save_watchlist(filtered)
-    return {"message": "Deleted"}
-
+def remove_watchlist(
+    item_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not delete_watch_item(db, current_user.id, item_id):
+        raise HTTPException(status_code=404, detail="Watchlist item not found")
+    return {"ok": True}

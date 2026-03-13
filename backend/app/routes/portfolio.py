@@ -1,28 +1,28 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
-from app.db.database import load_assets
-from app.utils.allocation_engine import build_allocation_metrics
-from app.utils.portfolio_engine import calculate_portfolio_overview
-
+from app.db.session import get_db
+from app.db.asset_repo import list_assets
+from app.db.models import User
+from app.utils.auth_utils import get_current_user
+from app.utils.portfolio_engine import compute_summary, compute_analysis
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
 
 @router.get("/summary")
-def get_portfolio_summary():
-    """
-    投资组合总览：总成本、当前市值、总盈亏和收益率。
-    """
-    assets = load_assets()
-    return calculate_portfolio_overview(assets)
+def portfolio_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    assets = list_assets(db, current_user.id)
+    return compute_summary(assets)
 
 
 @router.get("/analysis")
-def get_portfolio_analysis():
-    """
-    投资组合分析：资产类型占比、单资产占比、集中度指标。
-    """
-    assets = load_assets()
-    return build_allocation_metrics(assets)
-
-
+def portfolio_analysis(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    assets = list_assets(db, current_user.id)
+    return compute_analysis(assets)

@@ -1,39 +1,46 @@
-from typing import List
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from fastapi import APIRouter, HTTPException
-
-from app.db.cashflow_repo import load_cashflows, save_cashflows
-from app.models.cashflow_model import Cashflow, CashflowCreate
-
-import uuid
-
+from app.db.session import get_db
+from app.db.cashflow_repo import list_cashflows, create_cashflow, delete_cashflow
+from app.db.models import User
+from app.utils.auth_utils import get_current_user
 
 router = APIRouter(prefix="/api/cashflows", tags=["cashflows"])
 
 
-@router.get("", response_model=List[Cashflow])
-def list_cashflows() -> List[Cashflow]:
-    return load_cashflows()
+class CashflowInput(BaseModel):
+    type: str
+    amount: float
+    date: str
+    note: Optional[str] = ""
 
 
-@router.post("", response_model=Cashflow)
-def create_cashflow(cf_in: CashflowCreate) -> Cashflow:
-    data = cf_in.dict()
-    data["id"] = str(uuid.uuid4())
-    data["date"] = str(data["date"])
+@router.get("")
+def get_cashflows(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return list_cashflows(db, current_user.id)
 
-    items = load_cashflows()
-    items.append(data)
-    save_cashflows(items)
-    return data
+
+@router.post("")
+def add_cashflow(
+    data: CashflowInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return create_cashflow(db, current_user.id, data.model_dump())
 
 
 @router.delete("/{cashflow_id}")
-def delete_cashflow(cashflow_id: str):
-    items = load_cashflows()
-    filtered = [i for i in items if i["id"] != cashflow_id]
-    if len(filtered) == len(items):
+def remove_cashflow(
+    cashflow_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not delete_cashflow(db, current_user.id, cashflow_id):
         raise HTTPException(status_code=404, detail="Cashflow not found")
-    save_cashflows(filtered)
-    return {"message": "Deleted"}
-
+    return {"ok": True}

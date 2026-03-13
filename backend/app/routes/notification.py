@@ -1,87 +1,74 @@
-from datetime import date
-from typing import List
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
-from fastapi import APIRouter
-
-from app.db.database import load_assets
-from app.db.plan_repo import load_plans
-from app.utils.allocation_engine import build_allocation_metrics
-from app.utils.risk_engine import estimate_portfolio_risk
-
+from app.db.session import get_db
+from app.db.asset_repo import list_assets
+from app.db.cashflow_repo import list_cashflows
+from app.db.plan_repo import list_plans
+from app.db.models import User
+from app.utils.auth_utils import get_current_user
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 
+CONCENTRATION_THRESHOLD = 0.5
+GOAL_NEAR_THRESHOLD = 0.9
+
 
 @router.get("")
-def get_notifications() -> dict:
-    """
-    通知系统：
-    - 价格/风险波动提醒（基于组合波动率）
-    - 集中度提醒（Top1/Top3 或 HHI 过高）
-    - 目标达成提醒（current_amount >= target_amount）
-    """
-    assets = load_assets()
-    alloc = build_allocation_metrics(assets)
-    risk = estimate_portfolio_risk(assets)
-    plans = load_plans()
+def get_notifications(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    uid = current_user.id
+    assets = list_assets(db, uid)
+    plans = list_plans(db, uid)
+    cashflows = list_cashflows(db, uid)
+    notifications = []
 
-    notifications: List[dict] = []
+    total_value = sum(a.get("total_value", 0) for a in assets)
+    if total_value > 0:
+        from collections import defaultdict
+        type_values = defaultdict(float)
+        for a in assets:
+            type_values[a["type"]] += a.get("total_value", 0)
+        for t, v in type_values.items():
+            pct = v / total_value
+            if pct >= CONCENTRATION_THRESHOLD:
+                notifications.append({
+                    "type": "concentration",
+                    "level": "warning",
+                    "message": f"{t} makes up {pct*100:.1f}% of your portfolio — consider diversifying.",
+                })
 
-    # 风险相关提醒
-    if risk["risk_score"] >= 4:
-      notifications.append(
-        {
-          "type": "risk",
-          "level": "warning" if risk["risk_score"] == 4 else "danger",
-          "message": f"Portfolio risk level is {risk['risk_level']} (vol {risk['volatility']}%), please review your allocation.",
-        }
-      )
-
-    # 集中度提醒
-    conc = alloc["concentration"]
-    if conc["top1_weight_pct"] > 40:
-      notifications.append(
-        {
-          "type": "concentration",
-          "level": "warning",
-          "message": f"Top 1 holding weight is {conc['top1_weight_pct']}%, portfolio may be too concentrated.",
-        }
-      )
-    if conc["hhi"] > 0.18:
-      notifications.append(
-        {
-          "type": "concentration",
-          "level": "info",
-          "message": f"Portfolio HHI is {conc['hhi']:.4f}, consider increasing diversification.",
-        }
-      )
-
-    # 目标达成提醒
-    today = date.today()
     for p in plans:
-      if p["current_amount"] >= p["target_amount"]:
-        notifications.append(
-          {
-            "type": "goal",
-            "level": "success",
-            "message": f"Goal \"{p['name']}\" has been reached!",
-          }
-        )
-      else:
-        # 距离截止日期较近的提醒
-        try:
-          deadline = date.fromisoformat(p["deadline"])
-          days_left = (deadline - today).days
-          if 0 <= days_left <= 30:
-            notifications.append(
-              {
+        progress = p["current_amount"] / p["target_amount"] if p["target_amount"] else 0
+        if progress >= GOAL_NEAR_THRESHOLD and progress < 1.0:
+            notifications.append({
                 "type": "goal",
-                "level": "warning",
-                "message": f"Goal \"{p['name']}\" is {days_left} days from deadline.",
-              }
-            )
-        except Exception:
-          continue
+                "level": "success",
+                "message": f"Goal '{p['name']}' is {progress*100:.0f}% complete — almost there!",
+            })
+        elif progress >= 1.0:
+            notifications.append({
+                "type": "goal",
+                "level": "success",
+                "message": f"Goal '{p['name']}' has been achieved!",
+            })
 
-    return {"items": notifications}
+    total_in = sum(c["amount"] for c in cashflows if c["type"] in ("Deposit", "Dividend"))
+    total_out = sum(c["amount"] for c in cashflows if c["type"] in ("Withdraw", "Fee"))
+    if total_out > total_in * 0.5 and total_in > 0:
+        notifications.append({
+            "type": "cashflow",
+            "level": "danger",
+            "message": f"Outflows (${total_out:,.0f}) exceed 50% of inflows (${total_in:,.0f}).",
+        })
 
+    if not notifications:
+        notifications.append({
+            "type": "info",
+            "level": "info",
+            "message": "Portfolio looks healthy. No alerts at this time.",
+        })
+
+    return notifications

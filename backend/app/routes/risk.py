@@ -1,22 +1,19 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
-from app.db.database import load_assets
-from app.utils.risk_engine import estimate_portfolio_risk
-
+from app.db.session import get_db
+from app.db.asset_repo import list_assets
+from app.db.models import User
+from app.utils.auth_utils import get_current_user
+from app.utils.portfolio_engine import compute_risk_metrics
 
 router = APIRouter(prefix="/api/risk", tags=["risk"])
 
 
-@router.get("/metrics")
-def get_risk_metrics():
-    """
-    风险分析接口：
-    - 年化波动率
-    - 估算最大回撤
-    - 标准差（与波动率一致）
-    - 风险评分 / 等级
-    - 当前资产类型配置快照
-    """
-    assets = load_assets()
-    return estimate_portfolio_risk(assets)
-
+@router.get("")
+def get_risk_metrics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    assets = list_assets(db, current_user.id)
+    return compute_risk_metrics(assets)

@@ -1,21 +1,36 @@
 import axios from 'axios';
 
-const api = axios.create({
-  // Use relative baseURL so Vite proxy can forward to backend.
-  // You can override with VITE_API_BASE_URL if needed.
-  baseURL: import.meta?.env?.VITE_API_BASE_URL || '/api',
+const api = axios.create({ baseURL: '/api' });
+
+// Attach JWT token to every request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('ai_invest_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
-export const getAssets = (params = {}) => {
-  const q = new URLSearchParams();
-  if (params.type) q.set('type', params.type);
-  if (params.exchange) q.set('exchange', params.exchange);
-  const query = q.toString();
-  return api.get(`/assets${query ? `?${query}` : ''}`);
-};
+// Auto-logout on 401
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('ai_invest_token');
+      localStorage.removeItem('ai_invest_user');
+      window.location.href = '/';
+    }
+    return Promise.reject(err);
+  }
+);
+
+export default api;
+
+// ─── Asset helpers ────────────────────────────────────────────────────────────
+export const getAssets = (params = {}) => api.get('/assets', { params });
 export const createAsset = (data) => api.post('/assets', data);
 export const updateAsset = (id, data) => api.put(`/assets/${id}`, data);
 export const deleteAsset = (id) => api.delete(`/assets/${id}`);
-export const getStrategy = () => api.get('/strategy');
 
-export default api;
+// ─── Strategy ─────────────────────────────────────────────────────────────────
+export const getStrategy = () => api.get('/strategy');

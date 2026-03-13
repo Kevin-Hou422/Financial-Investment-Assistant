@@ -1,53 +1,49 @@
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
+import csv, io
+from sqlalchemy.orm import Session
 
-from app.db.cashflow_repo import load_cashflows
-from app.db.database import load_assets
-from app.db.plan_repo import load_plans
-from app.utils.portfolio_engine import calculate_portfolio_overview
+from app.db.session import get_db
+from app.db.asset_repo import list_assets
+from app.db.cashflow_repo import list_cashflows
+from app.db.plan_repo import list_plans
+from app.db.models import User
+from app.utils.auth_utils import get_current_user
+from app.utils.portfolio_engine import compute_summary
 
-
-router = APIRouter(prefix="/api/reports", tags=["reports"])
-
-
-@router.get("/assets")
-def asset_report():
-    """
-    资产报表：返回当前全部资产明细。
-    """
-    return {"assets": load_assets()}
+router = APIRouter(prefix="/api/report", tags=["report"])
 
 
 @router.get("/performance")
-def performance_report():
-    """
-    收益报表：返回组合概览 + 资金流水 + 目标计划，用于前端生成图表。
-    """
-    assets = load_assets()
-    overview = calculate_portfolio_overview(assets)
-    cashflows = load_cashflows()
-    plans = load_plans()
-    return {
-        "overview": overview,
-        "cashflows": cashflows,
-        "plans": plans,
-    }
+def performance_report(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    uid = current_user.id
+    assets = list_assets(db, uid)
+    cashflows = list_cashflows(db, uid)
+    plans = list_plans(db, uid)
+    overview = compute_summary(assets)
+    return {"overview": overview, "assets": assets, "cashflows": cashflows, "plans": plans}
 
 
 @router.get("/export/csv")
-def export_csv() -> Response:
-    """
-    简单 CSV 导出：导出当前资产列表为 CSV 文件。
-    """
-    assets = load_assets()
-    headers = ["id", "name", "type", "quantity", "price", "total_value", "buy_date"]
-    lines = [",".join(headers)]
-    for a in assets:
-        row = [str(a.get(h, "")) for h in headers]
-        lines.append(",".join(row))
-    csv_content = "\n".join(lines)
-    return Response(
-        content=csv_content,
-        media_type="text/csv",
-        headers={"Content-Disposition": 'attachment; filename="asset_report.csv"'},
+def export_csv(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    assets = list_assets(db, current_user.id)
+    output = io.StringIO()
+    writer = csv.DictWriter(
+        output,
+        fieldnames=["id", "name", "type", "exchange", "quantity", "price", "total_value", "buy_date"],
     )
-
+    writer.writeheader()
+    for a in assets:
+        writer.writerow({k: a.get(k, "") for k in writer.fieldnames})
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=assets.csv"},
+    )

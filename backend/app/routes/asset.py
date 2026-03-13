@@ -1,63 +1,63 @@
-from fastapi import APIRouter, HTTPException, Query
-from typing import List, Optional
-import uuid
-from app.models.asset_model import Asset, AssetCreate
-from app.db.database import load_assets, save_assets
-from app.utils.helpers import validate_asset_data
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-router = APIRouter()
+from app.db.session import get_db
+from app.db.asset_repo import list_assets, create_asset, update_asset, delete_asset
+from app.db.models import User
+from app.utils.auth_utils import get_current_user
 
-@router.get("/api/assets", response_model=List[Asset])
+router = APIRouter(prefix="/api/assets", tags=["assets"])
+
+
+class AssetInput(BaseModel):
+    name: str
+    type: str
+    exchange: Optional[str] = ""
+    quantity: float
+    price: float
+    buy_date: str
+
+
+@router.get("")
 def get_assets(
-    type: Optional[str] = Query(None, description="Asset type filter"),
-    exchange: Optional[str] = Query(None, description="Exchange/category filter"),
+    type: Optional[str] = None,
+    exchange: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    assets = load_assets()
-    if type:
-        assets = [a for a in assets if a.get("type") == type]
-    if exchange:
-        assets = [a for a in assets if a.get("exchange") == exchange]
-    return assets
+    return list_assets(db, current_user.id, asset_type=type, exchange=exchange)
 
-@router.post("/api/assets", response_model=Asset)
-def create_asset(asset_in: AssetCreate):
-    data = asset_in.dict()
-    data["buy_date"] = str(data["buy_date"])
-    if data.get("exchange") is None:
-        data["exchange"] = ""
-    if not validate_asset_data(data):
-        raise HTTPException(status_code=400, detail="Invalid asset data")
-    
-    new_asset = data.copy()
-    new_asset["id"] = str(uuid.uuid4())
-    new_asset["total_value"] = round(new_asset["quantity"] * new_asset["price"], 2)
-    
-    assets = load_assets()
-    assets.append(new_asset)
-    save_assets(assets)
-    return new_asset
 
-@router.put("/api/assets/{asset_id}", response_model=Asset)
-def update_asset(asset_id: str, asset_in: AssetCreate):
-    assets = load_assets()
-    for i, a in enumerate(assets):
-        if a["id"] == asset_id:
-            updated = asset_in.dict()
-            updated["buy_date"] = str(updated["buy_date"])
-            updated["id"] = asset_id
-            if updated.get("exchange") is None:
-                updated["exchange"] = ""
-            updated["total_value"] = round(updated["quantity"] * updated["price"], 2)
-            assets[i] = updated
-            save_assets(assets)
-            return updated
-    raise HTTPException(status_code=404, detail="Asset not found")
+@router.post("")
+def add_asset(
+    data: AssetInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return create_asset(db, current_user.id, data.model_dump())
 
-@router.delete("/api/assets/{asset_id}")
-def delete_asset(asset_id: str):
-    assets = load_assets()
-    filtered = [a for a in assets if a["id"] != asset_id]
-    if len(assets) == len(filtered):
+
+@router.put("/{asset_id}")
+def edit_asset(
+    asset_id: str,
+    data: AssetInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = update_asset(db, current_user.id, asset_id, data.model_dump())
+    if not result:
         raise HTTPException(status_code=404, detail="Asset not found")
-    save_assets(filtered)
-    return {"message": "Deleted successfully"}
+    return result
+
+
+@router.delete("/{asset_id}")
+def remove_asset(
+    asset_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not delete_asset(db, current_user.id, asset_id):
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return {"ok": True}

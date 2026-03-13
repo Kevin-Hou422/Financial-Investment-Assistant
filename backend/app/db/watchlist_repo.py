@@ -1,25 +1,36 @@
-import json
-import os
 from typing import Dict, List
+import uuid
 
-from config import BASE_DIR
+from sqlalchemy.orm import Session
 
-_WATCHLIST_FILE = os.path.join(BASE_DIR, "watchlist.json")
-
-
-def _ensure_file() -> None:
-    if not os.path.exists(_WATCHLIST_FILE):
-        with open(_WATCHLIST_FILE, "w", encoding="utf-8") as f:
-            json.dump([], f)
+from app.db.models import WatchlistItem
 
 
-def load_watchlist() -> List[Dict]:
-    _ensure_file()
-    with open(_WATCHLIST_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+def _row(w: WatchlistItem) -> Dict:
+    return {"id": w.id, "user_id": w.user_id, "symbol": w.symbol,
+            "asset_type": w.asset_type, "note": w.note or ""}
 
 
-def save_watchlist(items: List[Dict]) -> None:
-    with open(_WATCHLIST_FILE, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
+def list_watchlist(db: Session, user_id: str) -> List[Dict]:
+    return [_row(w) for w in
+            db.query(WatchlistItem).filter(WatchlistItem.user_id == user_id).all()]
 
+
+def create_watch_item(db: Session, user_id: str, data: Dict) -> Dict:
+    item = WatchlistItem(
+        id=str(uuid.uuid4()), user_id=user_id, symbol=data["symbol"],
+        asset_type=data.get("asset_type", "Stock"),
+        note=data.get("note") or "",
+    )
+    db.add(item); db.commit(); db.refresh(item)
+    return _row(item)
+
+
+def delete_watch_item(db: Session, user_id: str, item_id: str) -> bool:
+    item = db.query(WatchlistItem).filter(
+        WatchlistItem.id == item_id, WatchlistItem.user_id == user_id
+    ).first()
+    if not item:
+        return False
+    db.delete(item); db.commit()
+    return True

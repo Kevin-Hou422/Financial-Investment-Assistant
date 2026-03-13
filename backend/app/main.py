@@ -1,78 +1,41 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.db.session import create_tables
 from app.routes import (
-    agent,
-    alerts,
-    analytics,
-    asset,
-    cashflow,
-    market,
-    news,
-    notification,
-    plan,
-    portfolio,
-    report,
-    risk,
-    watchlist,
+    asset, cashflow, plan, alerts, watchlist,
+    portfolio, risk, analytics, notification, report,
+    market, news, strategy,
 )
-from app.scheduler.market_scheduler import setup_scheduler
-from app.utils.generate_strategy import generate_strategy
-
+from app.routes.auth import router as auth_router
 
 app = FastAPI(title="AI Investment Assistant API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Asset management
+# Create all DB tables on startup
+@app.on_event("startup")
+def on_startup():
+    create_tables()
+
+
+app.include_router(auth_router)
 app.include_router(asset.router)
-
-# Cashflows
 app.include_router(cashflow.router)
-
-# Plans / goals
 app.include_router(plan.router)
-
-# Market data
-app.include_router(market.router)
-
-# Portfolio overview
-app.include_router(portfolio.router)
-
-# Risk metrics
-app.include_router(risk.router)
-
-# Reports
-app.include_router(report.router)
-
-# Notifications
-app.include_router(notification.router)
-
-# Watchlist
-app.include_router(watchlist.router)
-
-# Alerts
 app.include_router(alerts.router)
-
-# News
-app.include_router(news.router)
-
-# Analytics
+app.include_router(watchlist.router)
+app.include_router(portfolio.router)
+app.include_router(risk.router)
 app.include_router(analytics.router)
-
-# Agent placeholder endpoints
-app.include_router(agent.router)
-
-# Scheduler: background refresh
-setup_scheduler(app)
-
-
-@app.get("/api/strategy")
-def get_strategy():
-    return generate_strategy()
+app.include_router(notification.router)
+app.include_router(report.router)
+app.include_router(market.router)
+app.include_router(news.router)
+app.include_router(strategy.router)

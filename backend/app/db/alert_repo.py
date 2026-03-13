@@ -1,25 +1,39 @@
-import json
-import os
 from typing import Dict, List
+import uuid
 
-from config import BASE_DIR
+from sqlalchemy.orm import Session
 
-_ALERT_FILE = os.path.join(BASE_DIR, "alerts.json")
-
-
-def _ensure_file() -> None:
-    if not os.path.exists(_ALERT_FILE):
-        with open(_ALERT_FILE, "w", encoding="utf-8") as f:
-            json.dump([], f)
+from app.db.models import Alert
 
 
-def load_alerts() -> List[Dict]:
-    _ensure_file()
-    with open(_ALERT_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+def _row(a: Alert) -> Dict:
+    return {"id": a.id, "user_id": a.user_id, "symbol": a.symbol,
+            "asset_type": a.asset_type, "exchange": a.exchange or "",
+            "direction": a.direction, "target_price": a.target_price}
 
 
-def save_alerts(items: List[Dict]) -> None:
-    with open(_ALERT_FILE, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
+def list_alerts(db: Session, user_id: str) -> List[Dict]:
+    return [_row(a) for a in
+            db.query(Alert).filter(Alert.user_id == user_id).all()]
 
+
+def create_alert(db: Session, user_id: str, data: Dict) -> Dict:
+    alert = Alert(
+        id=str(uuid.uuid4()), user_id=user_id, symbol=data["symbol"],
+        asset_type=data.get("asset_type", "Stock"),
+        exchange=data.get("exchange") or "",
+        direction=data.get("direction", "above"),
+        target_price=float(data["target_price"]),
+    )
+    db.add(alert); db.commit(); db.refresh(alert)
+    return _row(alert)
+
+
+def delete_alert(db: Session, user_id: str, alert_id: str) -> bool:
+    alert = db.query(Alert).filter(
+        Alert.id == alert_id, Alert.user_id == user_id
+    ).first()
+    if not alert:
+        return False
+    db.delete(alert); db.commit()
+    return True
