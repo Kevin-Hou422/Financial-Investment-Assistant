@@ -6,9 +6,9 @@ export const reportService = {
     return res.data;
   },
   getPerformanceReport: async () => {
-    const res = await api.get('/reports/performance');
+    const res = await api.get('/report/performance');
     return res.data;
   },
-  exportCsvUrl: () => `${api.defaults.baseURL}/reports/export/csv`,
+  exportCsvUrl: () => `${api.defaults.baseURL}/report/export/csv`,
 };
 

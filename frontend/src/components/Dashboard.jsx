@@ -119,8 +119,8 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className={cardCls}>
           <h3 className="text-base font-bold text-white mb-4 text-center">Asset Allocation</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 min-h-0">
+            <ResponsiveContainer width="100%" height="100%" minHeight={200}>
               <PieChart>
                 <Pie data={typeData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label>
                   {typeData.map((_, i) => (
@@ -135,8 +135,8 @@ export default function Dashboard() {
         </div>
         <div className={cardCls}>
           <h3 className="text-base font-bold text-white mb-4 text-center">Value by Type</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 min-h-0">
+            <ResponsiveContainer width="100%" height="100%" minHeight={200}>
               <BarChart data={typeData}>
                 <XAxis dataKey="name" stroke="#6B7280" tick={{ fill: '#9CA3AF', fontSize: 11 }} />
                 <YAxis stroke="#6B7280" tick={{ fill: '#9CA3AF', fontSize: 11 }} />

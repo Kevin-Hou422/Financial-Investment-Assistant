@@ -38,8 +38,8 @@ export default function PlaceholderChart() {
         AI Strategy Projection
       </h3>
       {message && <p className="text-xs text-gray-400 mb-4">{message}</p>}
-      <div className="h-64 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-64 w-full min-h-0">
+        <ResponsiveContainer width="100%" height="100%" minHeight={200}>
           <LineChart data={strategyData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
             <XAxis dataKey="date" stroke="#4B5563" tick={{ fill: '#6B7280', fontSize: 11 }} />
