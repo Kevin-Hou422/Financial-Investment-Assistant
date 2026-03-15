@@ -8,6 +8,7 @@ from app.routes import (
     market, news, strategy,
 )
 from app.routes.auth import router as auth_router
+from app.routes.agent import router as agent_router
 
 app = FastAPI(title="AI Investment Assistant API")
 
@@ -39,3 +40,4 @@ app.include_router(report.router)
 app.include_router(market.router)
 app.include_router(news.router)
 app.include_router(strategy.router)
+app.include_router(agent_router)

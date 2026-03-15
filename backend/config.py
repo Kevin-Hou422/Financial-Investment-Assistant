@@ -26,3 +26,12 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 # URLs
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+
+# ── Multi-Agent LLM settings ──────────────────────────────────────────────────
+# LLM_PROVIDER: "openai" (default) or "ollama" (free, local)
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
+# OpenAI: use gpt-4o-mini for best cost/quality ratio
+# Ollama:  use any locally-pulled model, e.g. "llama3", "mistral"
+LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
