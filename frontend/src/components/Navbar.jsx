@@ -126,61 +126,57 @@ export default function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-md border-b border-gray-800 shadow-lg shadow-black/20">
-      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-6">
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
-                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+      <div className="px-3 py-2 flex items-center gap-2">
+        {/* Logo */}
+        <div className="flex items-center gap-2 flex-shrink-0 pr-2 border-r border-gray-700">
+          <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-md shadow-violet-500/30">
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
           </div>
-          <div>
-            <div className="text-base font-black tracking-tight text-white leading-tight">
-              AI Investment
-            </div>
-            <div className="text-[10px] uppercase tracking-[0.15em] text-gray-500 leading-tight">
-              Portfolio Dashboard
-            </div>
+          <span className="text-sm font-black tracking-tight text-white whitespace-nowrap hidden lg:block">AI Investment</span>
+        </div>
+
+        {/* Nav items — horizontal scroll on overflow */}
+        <div className="flex-1 overflow-x-auto scrollbar-none min-w-0">
+          <div className="flex items-center gap-0.5 w-max">
+            {NAV_ITEMS.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
+                  isActive(item)
+                    ? `${item.activeColor} shadow-md`
+                    : `text-gray-400 ${item.hoverColor}`
+                }`}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </Link>
+            ))}
           </div>
         </div>
 
-        <div className="flex items-center gap-1 flex-wrap">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${
-                isActive(item)
-                  ? `${item.activeColor} shadow-md`
-                  : `text-gray-400 ${item.hoverColor}`
-              }`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </Link>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <div className="flex items-center gap-2 bg-gray-800 border border-gray-700 rounded-xl px-3 py-1.5">
-            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center text-white text-xs font-black flex-shrink-0">
+        {/* User + Logout */}
+        <div className="flex items-center gap-2 flex-shrink-0 pl-2 border-l border-gray-700">
+          <div className="flex items-center gap-1.5 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1">
+            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
               {user?.avatar || user?.name?.[0]?.toUpperCase() || 'U'}
             </div>
-            <span className="text-xs text-gray-300 font-medium max-w-[100px] truncate hidden sm:block">
+            <span className="text-xs text-gray-300 font-medium max-w-[80px] truncate hidden md:block">
               {user?.name || user?.email || 'User'}
             </span>
           </div>
           <button
             type="button"
             onClick={logout}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg text-gray-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-200"
+            className="flex items-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg text-gray-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-200"
             title="Sign out"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            <span className="hidden sm:block">Logout</span>
           </button>
         </div>
       </div>

@@ -70,8 +70,8 @@ function RiskCard({ riskData }) {
           <div className={`text-3xl font-black ${color}`}>{lvl.toUpperCase()}</div>
           <div className="text-xs text-gray-500 mt-1">Risk Level</div>
         </div>
-        <div className="flex-1 h-48">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="flex-1 h-48 min-h-0" style={{minHeight: '192px'}}>
+          <ResponsiveContainer width="100%" height="100%" minHeight={192}>
             <RadarChart data={radarData}>
               <PolarGrid stroke="#374151" />
               <PolarAngleAxis dataKey="subject" tick={{ fill: '#6B7280', fontSize: 10 }} />
@@ -318,8 +318,8 @@ export default function AIStrategyPage() {
           </div>
         </div>
         {projMsg && <p className="text-xs text-gray-500 mb-4">{projMsg}</p>}
-        <div className="h-64 min-h-0">
-          <ResponsiveContainer width="100%" height="100%" minHeight={200}>
+        <div className="h-64 min-h-0" style={{minHeight: '256px'}}>
+          <ResponsiveContainer width="100%" height="100%" minHeight={256}>
             <LineChart data={projection || []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
               <XAxis dataKey="date" stroke="#4B5563" tick={{ fill: '#6B7280', fontSize: 11 }} />

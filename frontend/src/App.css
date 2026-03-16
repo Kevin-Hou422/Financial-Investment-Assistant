@@ -9,6 +9,15 @@
 *::-webkit-scrollbar-track {
   background: #111827;
 }
+
+/* Hide scrollbar for navbar nav strip */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
 *::-webkit-scrollbar-thumb {
   background: #374151;
   border-radius: 3px;

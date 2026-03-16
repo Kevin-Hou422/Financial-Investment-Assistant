@@ -181,7 +181,7 @@ export default function AIChatPage() {
       id: 'welcome',
       role: 'assistant',
       type: 'welcome',
-      text: '你好！我是 AI Investment Assistant。我可以分析你的投资组合、评估风险、提供调仓建议，以及追踪你的财务目标。请输入任何问题或点击下方快捷操作开始。',
+      text: "Hello! I'm your AI Investment Assistant, powered by a multi-agent system. I can analyze your portfolio, assess risk, suggest rebalancing strategies, track your financial goals, and give you market context. Ask me anything — in English or Chinese.",
     },
   ]);
   const [input, setInput] = useState('');

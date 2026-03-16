@@ -23,7 +23,7 @@ def get_strategy(
     current_user=Depends(get_current_user),
 ):
     """Simple linear 12-month portfolio projection for the chart widget."""
-    assets = list_assets(db, current_user["user_id"])
+    assets = list_assets(db, current_user.id)
     total  = sum(a.get("total_value", 0) for a in assets) or 10000.0
 
     today  = datetime.today()
@@ -52,7 +52,7 @@ async def get_ai_strategy(
     from app.agents.tools.tools import ToolRegistry
     from app.agents.core.base import AgentTask
 
-    user_id = current_user["user_id"]
+    user_id = current_user.id
     task_id = str(uuid.uuid4())[:8]
     intent  = "rebalance_advice"
 
@@ -78,7 +78,7 @@ async def get_ai_strategy(
     strat_out = next((r.output for r in results if r.agent_name == "strategy_analyst" and r.status.value == "done"), {})
 
     # Projection data
-    assets = list_assets(db, user_id)
+    assets = list_assets(db, current_user.id)
     total  = sum(a.get("total_value", 0) for a in assets) or 10000.0
     today  = datetime.today()
     rate   = 0.007

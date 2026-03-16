@@ -30,7 +30,7 @@ from app.agents.core.logger import AgentLogger
 from app.agents.core.cache import llm_cache
 from app.agents.core.key_manager import key_manager
 
-router = APIRouter(prefix="/agent", tags=["agent"])
+router = APIRouter(prefix="/api/agent", tags=["agent"])
 
 
 # ── Legacy placeholder endpoints ─────────────────────────────────────────────
@@ -42,7 +42,7 @@ def agent_analyze_portfolio(
     current_user=Depends(get_current_user),
 ) -> dict:
     from app.interfaces.agent_portfolio_interface import get_current_portfolio
-    return {"status": "ok", "portfolio": get_current_portfolio(db, current_user["user_id"])}
+    return {"status": "ok", "portfolio": get_current_portfolio(db, current_user.id)}
 
 
 @router.get("/recommend_assets")
@@ -53,7 +53,7 @@ def agent_recommend_assets(
     from app.interfaces.agent_market_interface import get_market_snapshot
     return {
         "status": "ok",
-        "market_snapshot": get_market_snapshot(db, current_user["user_id"]),
+        "market_snapshot": get_market_snapshot(db, current_user.id),
         "recommendations": [],
     }
 
@@ -64,7 +64,7 @@ def agent_risk_analysis(
     current_user=Depends(get_current_user),
 ) -> dict:
     from app.interfaces.agent_risk_interface import get_risk_metrics
-    return {"status": "ok", "risk": get_risk_metrics(db, current_user["user_id"])}
+    return {"status": "ok", "risk": get_risk_metrics(db, current_user.id)}
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -115,7 +115,7 @@ async def agent_chat(
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="message must not be empty")
 
-    user_id      = current_user["user_id"]
+    user_id      = current_user.id
     token_budget = max(100, min(req.token_budget or 600, 1500))
     task_id      = str(uuid.uuid4())[:8]
 
@@ -200,7 +200,7 @@ def get_agent_logs(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> dict:
-    return {"logs": AgentLogger.get_recent(db, current_user["user_id"], limit=limit)}
+    return {"logs": AgentLogger.get_recent(db, current_user.id, limit=limit)}
 
 
 # ── Memory management ────────────────────────────────────────────────────────
@@ -210,5 +210,5 @@ def clear_memory(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> dict:
-    AgentMemory(db, current_user["user_id"]).clear()
+    AgentMemory(db, current_user.id).clear()
     return {"status": "memory cleared"}

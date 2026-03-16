@@ -19,14 +19,16 @@ export default function PlaceholderChart() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    getStrategy().then((res) => {
-      const formatted = res.data.dates.map((date, index) => ({
-        date,
-        value: res.data.portfolio_values[index],
-      }));
-      setStrategyData(formatted);
-      setMessage(res.data.message);
-    });
+    getStrategy()
+      .then((res) => {
+        const formatted = res.data.dates.map((date, index) => ({
+          date,
+          value: res.data.portfolio_values[index],
+        }));
+        setStrategyData(formatted);
+        setMessage(res.data.message);
+      })
+      .catch(() => {});
   }, []);
 
   return (
