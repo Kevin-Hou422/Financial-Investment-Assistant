@@ -1,7 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 const inputCls = 'w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/40 placeholder:text-gray-500 text-sm transition-all';
+
+const TITLE_TEXT = 'Invest Smart With AI Investment Assistant';
+
+function TypewriterTitle() {
+  const [displayed, setDisplayed] = useState('');
+  const [done, setDone] = useState(false);
+  const indexRef = useRef(0);
+
+  useEffect(() => {
+    if (done) return;
+    const interval = setInterval(() => {
+      if (indexRef.current < TITLE_TEXT.length) {
+        setDisplayed(TITLE_TEXT.slice(0, indexRef.current + 1));
+        indexRef.current += 1;
+      } else {
+        setDone(true);
+        clearInterval(interval);
+      }
+    }, 55);
+    return () => clearInterval(interval);
+  }, [done]);
+
+  return (
+    <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight text-center">
+      {displayed}
+      {!done && <span className="animate-pulse text-violet-400">|</span>}
+    </h1>
+  );
+}
 
 export default function AuthPage() {
   const { login, register } = useAuth();
@@ -13,7 +42,6 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
 
   const handleGoogle = () => {
-    // Real redirect to backend Google OAuth
     window.location.href = '/api/auth/google';
   };
 
@@ -38,6 +66,7 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      {/* Background glows */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-violet-600/10 blur-3xl" />
         <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-indigo-600/10 blur-3xl" />
@@ -45,19 +74,17 @@ export default function AuthPage() {
       </div>
 
       <div className="relative z-10 w-full max-w-md space-y-8">
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-2xl shadow-violet-500/30 mb-2">
+        {/* Icon + Typewriter title */}
+        <div className="text-center space-y-5">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-2xl shadow-violet-500/30">
             <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
           </div>
-          <h1 className="text-3xl font-black text-white tracking-tight">AI Investment Assistant</h1>
-          <p className="text-gray-400 text-base leading-relaxed">
-            Invest smart with <span className="text-violet-400 font-semibold">AI-powered insights</span>.<br />
-            Your portfolio, analyzed in real time.
-          </p>
+          <TypewriterTitle />
         </div>
 
+        {/* Auth card */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl shadow-black/40 space-y-5">
           <button
             type="button"

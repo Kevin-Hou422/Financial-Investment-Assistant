@@ -128,7 +128,7 @@ export default function Navbar() {
     <nav className="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-md border-b border-gray-800 shadow-lg shadow-black/20">
       <div className="px-3 py-2 flex items-center gap-2">
         {/* Logo */}
-        <div className="flex items-center gap-2 flex-shrink-0 pr-2 border-r border-gray-700">
+        <div className="flex items-center gap-2 flex-shrink-0 pr-3 border-r border-gray-700">
           <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-md shadow-violet-500/30">
             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -137,9 +137,9 @@ export default function Navbar() {
           <span className="text-sm font-black tracking-tight text-white whitespace-nowrap hidden lg:block">AI Investment</span>
         </div>
 
-        {/* Nav items — horizontal scroll on overflow */}
-        <div className="flex-1 overflow-x-auto scrollbar-none min-w-0">
-          <div className="flex items-center gap-0.5 w-max">
+        {/* Nav items — centered */}
+        <div className="flex-1 flex items-center justify-center overflow-x-auto scrollbar-none min-w-0">
+          <div className="flex items-center gap-0.5">
             {NAV_ITEMS.map((item) => (
               <Link
                 key={item.path}
@@ -158,7 +158,7 @@ export default function Navbar() {
         </div>
 
         {/* User + Logout */}
-        <div className="flex items-center gap-2 flex-shrink-0 pl-2 border-l border-gray-700">
+        <div className="flex items-center gap-2 flex-shrink-0 pl-3 border-l border-gray-700">
           <div className="flex items-center gap-1.5 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1">
             <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
               {user?.avatar || user?.name?.[0]?.toUpperCase() || 'U'}

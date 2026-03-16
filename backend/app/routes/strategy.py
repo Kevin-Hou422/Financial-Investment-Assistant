@@ -26,13 +26,28 @@ def get_strategy(
     assets = list_assets(db, current_user.id)
     total  = sum(a.get("total_value", 0) for a in assets) or 10000.0
 
+    import math
     today  = datetime.today()
-    rate   = 0.007  # ~8.4% annual
+    rate   = 0.0072   # ~8.6% annual growth
+    vol    = 0.022    # monthly volatility (realistic equity-bond mix)
+    seed   = int(total) % 9999 + 1
+
+    def pseudo(i):
+        x = math.sin(seed * 9301 + i * 49297 + 233720) * 10000
+        return x - int(x)  # 0-1
+
     dates  = [(today + timedelta(days=30 * i)).strftime("%Y-%m") for i in range(13)]
-    values = [round(total * ((1 + rate) ** i), 2) for i in range(13)]
+    values = []
+    for i in range(13):
+        if i == 0:
+            values.append(round(total, 2))
+        else:
+            noise  = (pseudo(i) - 0.5) * 2 * vol
+            growth = (1 + rate + noise) ** i
+            values.append(round(total * growth, 2))
 
     return {
-        "message": "Projected portfolio growth based on current allocation.",
+        "message": "Projected portfolio growth based on current allocation (with realistic monthly variance).",
         "dates": dates,
         "portfolio_values": values,
     }
