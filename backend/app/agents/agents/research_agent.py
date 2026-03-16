@@ -75,7 +75,7 @@ class ResearchAnalystAgent(BaseAgent):
         ]
 
         try:
-            output, tokens = await self._llm.complete(messages, max_tokens=task.token_budget)
+            output, tokens = await self._llm.complete(messages, max_tokens=task.token_budget, db=tools._db)
         except LLMError as exc:
             log.error("ResearchAnalystAgent LLM error: %s", exc)
             return AgentResult(

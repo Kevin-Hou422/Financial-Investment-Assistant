@@ -80,7 +80,7 @@ class StrategyAnalystAgent(BaseAgent):
         ]
 
         try:
-            output, tokens = await self._llm.complete(messages, max_tokens=task.token_budget)
+            output, tokens = await self._llm.complete(messages, max_tokens=task.token_budget, db=tools._db)
         except LLMError as exc:
             log.error("StrategyAnalystAgent LLM error: %s", exc)
             return AgentResult(

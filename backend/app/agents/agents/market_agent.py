@@ -1,12 +1,10 @@
 """
-MarketAnalystAgent — real-time market context analysis agent.
+MarketAnalystAgent — real-time market context analysis.
 
 Responsibilities:
-  - Summarise watchlist performance vs market
-  - Identify market trends relevant to user's holdings
-  - Flag alert conditions on tracked assets
-
-Data source: ToolRegistry (watchlist, alerts — no external API calls here).
+  - Live price quotes for user's holdings via market interface
+  - Watchlist monitoring and alert flags
+  - Market sentiment summary relevant to the user's portfolio
 """
 from __future__ import annotations
 
@@ -29,11 +27,13 @@ Rules:
 
 
 def _build_market_prompt(data: Dict) -> str:
-    watchlist = data.get("watchlist", [])[:8]   # cap at 8 items
-    alerts = data.get("alerts", [])[:5]
-    port = data.get("portfolio", {})
+    watchlist = data.get("watchlist", [])[:8]
+    alerts    = data.get("alerts",    [])[:5]
+    port      = data.get("portfolio", {})
+    quotes    = data.get("market", {}).get("quotes", [])[:6]
     return f"""Analyze the market context for this user and reply with:
 {{"market_sentiment": "bullish|neutral|bearish",
+  "live_quotes_summary": "<1 sentence on recent price action>",
   "watchlist_highlights": [{{"symbol": "<name>", "observation": "<1 sentence>"}}],
   "active_alerts": ["<alert description>"],
   "opportunities": ["<up to 2 opportunities>"],
@@ -41,6 +41,7 @@ def _build_market_prompt(data: Dict) -> str:
   "summary": "<2 sentence market context>"}}
 
 Portfolio type allocation: {port.get('type_allocation', {})}
+Live quotes (up to 6): {quotes}
 Watchlist items: {watchlist}
 Active alerts: {alerts}
 
@@ -49,7 +50,7 @@ User question: {data.get('question', 'What is the current market situation for m
 
 class MarketAnalystAgent(BaseAgent):
     name = "market_analyst"
-    description = "Market trends, watchlist monitoring, and alert context analysis."
+    description = "Live market quotes, watchlist monitoring, and alert context analysis."
 
     def __init__(self) -> None:
         self._llm = LLMClient()
@@ -60,6 +61,7 @@ class MarketAnalystAgent(BaseAgent):
             data["portfolio"] = tools.get_portfolio_snapshot()
             data["watchlist"] = tools.get_raw_watchlist()
             data["alerts"]    = tools.get_raw_alerts()
+            data["market"]    = tools.get_market_snapshot()
         except Exception as exc:
             log.warning("MarketAnalystAgent tool error: %s", exc)
             return AgentResult(
@@ -73,7 +75,9 @@ class MarketAnalystAgent(BaseAgent):
         ]
 
         try:
-            output, tokens = await self._llm.complete(messages, max_tokens=task.token_budget)
+            output, tokens = await self._llm.complete(
+                messages, max_tokens=task.token_budget, db=tools._db
+            )
         except LLMError as exc:
             log.error("MarketAnalystAgent LLM error: %s", exc)
             return AgentResult(

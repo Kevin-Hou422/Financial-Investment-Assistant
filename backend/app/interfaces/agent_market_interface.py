@@ -1,18 +1,19 @@
-from datetime import datetime, timezone
-from typing import Any, Dict, List
+"""
+agent_market_interface — market snapshot for agents.
 
-from app.db.database import load_assets
-from app.external.crypto_api import fetch_crypto_price
-from app.external.fund_api import fetch_fund_price
-from app.external.gold_api import fetch_gold_price
-from app.external.stock_api import fetch_stock_price
+Supports two calling modes:
+  • New (SQLAlchemy): get_market_snapshot(db, user_id)  — per-user assets
+  • Legacy (JSON):    get_market_snapshot()             — reads assets.json
+"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy.orm import Session
 
 
 def _looks_like_symbol(value: str) -> bool:
-    """
-    Basic sanity check to avoid calling market APIs with non-symbol strings
-    (e.g., names in other languages).
-    """
     if not value:
         return False
     value = value.strip()
@@ -22,50 +23,56 @@ def _looks_like_symbol(value: str) -> bool:
     return all(ch in allowed for ch in value)
 
 
-def _fetch_for_asset_type(
-    symbol: str, asset_type: str, exchange: str = ""
-) -> Dict[str, Any]:
-    asset_type_lower = asset_type.lower()
-    if asset_type_lower == "stock":
-        return fetch_stock_price(
-            symbol, asset_type="stock", exchange=exchange or None
-        )
-    if asset_type_lower == "fund":
+def _fetch_quote(symbol: str, asset_type: str, exchange: str = "") -> Dict[str, Any]:
+    from app.external.stock_api  import fetch_stock_price
+    from app.external.fund_api   import fetch_fund_price
+    from app.external.crypto_api import fetch_crypto_price
+    from app.external.gold_api   import fetch_gold_price
+
+    t = asset_type.lower()
+    if t == "stock":
+        return fetch_stock_price(symbol, asset_type="stock", exchange=exchange or None)
+    if t == "fund":
         return fetch_fund_price(symbol)
-    if asset_type_lower == "crypto":
+    if t == "crypto":
         return fetch_crypto_price(symbol)
-    if asset_type_lower == "gold":
+    if t == "gold":
         return fetch_gold_price(symbol)
     return fetch_stock_price(symbol, asset_type="stock")
 
 
-def get_market_snapshot() -> Dict[str, Any]:
-    """
-    Agent 预留接口：获取简化的市场快照。
-
-    - 从当前资产列表中提取唯一标的代码与资产类型
-    - 为每个标的调用对应 external API，返回价格与涨跌幅
-    - 仅做数据汇总，不包含信号或策略判断
-    """
-    assets = load_assets()
-    seen: set[tuple[str, str, str]] = set()
+def _build_snapshot(assets: List[Dict]) -> Dict[str, Any]:
+    seen: set = set()
     quotes: List[Dict[str, Any]] = []
-
     for a in assets:
-        symbol = a.get("name")
-        asset_type = a.get("type", "Stock")
-        exchange = (a.get("exchange") or "").strip()
+        symbol    = a.get("name")
+        atype     = a.get("type", "Stock")
+        exchange  = (a.get("exchange") or "").strip()
         if not symbol or not _looks_like_symbol(str(symbol)):
             continue
-        key = (symbol, asset_type, exchange)
+        key = (symbol, atype, exchange)
         if key in seen:
             continue
         seen.add(key)
-        quote = _fetch_for_asset_type(symbol, asset_type, exchange)
-        quotes.append(quote)
+        try:
+            quotes.append(_fetch_quote(symbol, atype, exchange))
+        except Exception:
+            pass
+    return {"as_of": datetime.now(timezone.utc).isoformat(), "quotes": quotes}
 
-    return {
-        "as_of": datetime.now(timezone.utc).isoformat(),
-        "quotes": quotes,
-    }
 
+def get_market_snapshot(
+    db: Optional[Session] = None,
+    user_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Returns a market snapshot for all assets held by the user."""
+    if db is not None and user_id:
+        from app.db.asset_repo import list_assets
+        assets = list_assets(db, user_id)
+    else:
+        try:
+            from app.db.database import load_assets
+            assets = load_assets()
+        except Exception:
+            assets = []
+    return _build_snapshot(assets)

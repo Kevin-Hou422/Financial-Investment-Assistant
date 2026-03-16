@@ -177,7 +177,7 @@ class PortfolioAnalystAgent(BaseAgent):
         # ── 3. call LLM ───────────────────────────────────────────────────────
         try:
             output, tokens = await self._llm.complete(
-                messages, max_tokens=task.token_budget
+                messages, max_tokens=task.token_budget, db=tools._db
             )
         except LLMError as exc:
             log.error("PortfolioAnalystAgent LLM error: %s", exc)
