@@ -1,8 +1,8 @@
 """
-Token-budgeted LLM client.
+Token-budgeted LLM client with integrated response cache.
 Supports: OpenAI (gpt-4o-mini) and Ollama (local, free).
-Token consumption is strictly capped per call via max_tokens.
 JSON-mode is enforced so agents always get parseable output.
+Cache: identical calls within 5 min return cached result (zero token cost).
 """
 from __future__ import annotations
 
@@ -13,20 +13,14 @@ from typing import Any, Dict, List, Tuple
 import httpx
 
 from config import LLM_MODEL, LLM_PROVIDER, OPENAI_API_KEY, OLLAMA_BASE_URL
+from app.agents.core.cache import llm_cache
 
 log = logging.getLogger(__name__)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Exceptions
-# ──────────────────────────────────────────────────────────────────────────────
 
 class LLMError(Exception):
     """Raised when the LLM call fails or returns unparseable JSON."""
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Client
-# ──────────────────────────────────────────────────────────────────────────────
 
 class LLMClient:
     """
@@ -34,6 +28,9 @@ class LLMClient:
 
     Usage:
         content, tokens = await llm_client.complete(messages, max_tokens=400)
+
+    Returns (parsed_dict, tokens_used).
+    tokens_used is 0 on a cache hit.
     """
 
     def __init__(self) -> None:
@@ -42,19 +39,26 @@ class LLMClient:
         self.api_key = OPENAI_API_KEY
         self.ollama_url = OLLAMA_BASE_URL
 
-    # ── public ────────────────────────────────────────────────────────────────
-
     async def complete(
         self,
         messages: List[Dict[str, str]],
         max_tokens: int = 400,
         temperature: float = 0.2,
+        use_cache: bool = True,
     ) -> Tuple[Dict[str, Any], int]:
         """
         Returns (parsed_dict, tokens_used).
-        max_tokens is the HARD upper bound sent to the API — limits cost/latency.
-        JSON mode is always enabled so output is always a dict.
+        max_tokens is the HARD upper bound — limits cost/latency.
+        JSON mode is always enabled.
+        Cache is checked first; tokens_used == 0 on a cache hit.
         """
+        cache_key = llm_cache.make_key(self.model, messages, max_tokens)
+
+        if use_cache:
+            cached = llm_cache.get(cache_key)
+            if cached is not None:
+                return cached  # (dict, 0)
+
         if self.provider == "openai":
             raw, tokens = await self._openai(messages, max_tokens, temperature)
         elif self.provider == "ollama":
@@ -63,18 +67,20 @@ class LLMClient:
             raise LLMError(f"Unknown LLM_PROVIDER: {self.provider!r}")
 
         try:
-            return json.loads(raw), tokens
+            parsed = json.loads(raw)
         except json.JSONDecodeError as exc:
             log.warning("LLM returned non-JSON: %s", raw[:200])
             raise LLMError(f"LLM response is not valid JSON: {exc}") from exc
 
+        result = (parsed, tokens)
+        if use_cache:
+            llm_cache.set(cache_key, result)
+        return result
+
     # ── OpenAI ────────────────────────────────────────────────────────────────
 
     async def _openai(
-        self,
-        messages: List[Dict],
-        max_tokens: int,
-        temperature: float,
+        self, messages: List[Dict], max_tokens: int, temperature: float
     ) -> Tuple[str, int]:
         if not self.api_key:
             raise LLMError(
@@ -103,10 +109,7 @@ class LLMClient:
     # ── Ollama ────────────────────────────────────────────────────────────────
 
     async def _ollama(
-        self,
-        messages: List[Dict],
-        max_tokens: int,
-        temperature: float,
+        self, messages: List[Dict], max_tokens: int, temperature: float
     ) -> Tuple[str, int]:
         async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.post(
@@ -125,7 +128,6 @@ class LLMClient:
         resp.raise_for_status()
         data = resp.json()
         content = data["message"]["content"]
-        # Ollama eval_count ≈ output tokens
         tokens = data.get("eval_count", len(content.split()))
         log.info("Ollama %s | tokens≈%d", self.model, tokens)
         return content, tokens

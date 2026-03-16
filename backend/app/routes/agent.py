@@ -1,16 +1,18 @@
 """
 Agent routes.
 
-  GET  /agent/analyze_portfolio  — legacy placeholder (kept for compatibility)
+  GET  /agent/analyze_portfolio  — legacy placeholder
   GET  /agent/recommend_assets   — legacy placeholder
   GET  /agent/risk_analysis      — legacy placeholder
-  POST /agent/chat               — multi-agent chat (intent → manager → workflow → agent)
-  GET  /agent/intents            — list supported intents
+  POST /agent/chat               — auto-dispatch: single agent or multi-agent pipeline
+  GET  /agent/intents            — list intents, pipelines, registered agents
+  GET  /agent/logs               — recent agent call logs for current user
+  DELETE /agent/memory           — clear conversation memory for current user
 """
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -21,10 +23,13 @@ from app.interfaces.agent_portfolio_interface import get_current_portfolio
 from app.interfaces.agent_market_interface import get_market_snapshot
 from app.interfaces.agent_risk_interface import get_risk_metrics
 from app.utils.auth_utils import get_current_user
-from backend.app.agents.core.manager import manager_agent
-from backend.app.agents.workflows.workflow import workflow_engine
-from backend.app.agents.tools.tools import ToolRegistry
-from backend.app.agents.core.base import AgentTask, AgentStatus
+from app.agents.core.manager import manager_agent
+from app.agents.workflows.workflow import workflow_engine
+from app.agents.tools.tools import ToolRegistry
+from app.agents.core.base import AgentTask, AgentStatus
+from app.agents.core.memory import AgentMemory
+from app.agents.core.logger import AgentLogger
+from app.agents.core.cache import llm_cache
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
@@ -46,23 +51,34 @@ def agent_risk_analysis() -> dict:
     return {"status": "placeholder", "risk": get_risk_metrics()}
 
 
-# ── Multi-agent chat ──────────────────────────────────────────────────────────
+# ── Schemas ───────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
     message: str
-    token_budget: Optional[int] = 600   # hard cap; lower = cheaper
+    token_budget: Optional[int] = 600
 
 
-class ChatResponse(BaseModel):
+class AgentResultOut(BaseModel):
     task_id: str
-    intent: str
-    agent: str
+    agent_name: str
     status: str
     output: Dict[str, Any]
     tokens_used: int
     latency_ms: int
     error: Optional[str] = None
 
+
+class ChatResponse(BaseModel):
+    task_id: str
+    intent: str
+    pipeline: bool
+    agents_called: List[str]
+    results: List[AgentResultOut]
+    total_tokens: int
+    total_latency_ms: int
+
+
+# ── Multi-agent chat ──────────────────────────────────────────────────────────
 
 @router.post("/chat", response_model=ChatResponse)
 async def agent_chat(
@@ -71,24 +87,28 @@ async def agent_chat(
     current_user=Depends(get_current_user),
 ):
     """
-    Full multi-agent pipeline:
-      1. ManagerAgent.parse_intent()  — zero tokens (keyword scoring)
-      2. ManagerAgent.route()         — picks agent name
-      3. WorkflowEngine.run_single()  — dispatches AgentTask to agent
-      4. Agent fetches data via ToolRegistry then calls LLM
+    Unified entry point for the multi-agent system.
+
+    Flow:
+      1. ManagerAgent.parse_intent()     — zero tokens (keyword scoring)
+      2. ManagerAgent.get_pipeline()     — check if multi-agent pipeline applies
+      3a. WorkflowEngine.run_pipeline()  — sequential multi-agent chain
+      3b. WorkflowEngine.run_single()    — single-agent dispatch (fallback)
+      Memory, logging, and cache are handled inside the workflow engine.
     """
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="message must not be empty")
 
+    user_id = current_user["user_id"]
     token_budget = max(100, min(req.token_budget or 600, 1500))
+    task_id = str(uuid.uuid4())[:8]
 
-    # 1 + 2: intent parsing & routing (no LLM cost)
+    # 1 + 2: intent + routing (no LLM cost)
     intent = manager_agent.parse_intent(req.message)
+    pipeline_steps = manager_agent.get_pipeline(intent)
     agent_name = manager_agent.route(intent)
 
-    # 3: build task
-    task_id = str(uuid.uuid4())[:8]
-    task = AgentTask(
+    base_task = AgentTask(
         task_id=task_id,
         agent_name=agent_name,
         intent=req.message,
@@ -96,21 +116,51 @@ async def agent_chat(
         token_budget=token_budget,
     )
 
-    # 4: create per-request tool registry (scoped to current user)
-    tools = ToolRegistry(db=db, user_id=current_user["user_id"])
+    tools = ToolRegistry(db=db, user_id=user_id)
 
-    # 5: run
-    result = await workflow_engine.run_single(agent_name, task, tools)
+    # 3a: multi-agent pipeline
+    if pipeline_steps:
+        results = await workflow_engine.run_pipeline(
+            steps=pipeline_steps,
+            base_task=base_task,
+            tools=tools,
+            db=db,
+            user_id=user_id,
+        )
+    else:
+        # 3b: single agent
+        result = await workflow_engine.run_single(
+            agent_name=agent_name,
+            task=base_task,
+            tools=tools,
+            db=db,
+            user_id=user_id,
+        )
+        results = [result]
+
+    agents_called = [r.agent_name for r in results]
+    total_tokens = sum(r.tokens_used for r in results)
+    total_latency = sum(r.latency_ms for r in results)
 
     return ChatResponse(
         task_id=task_id,
         intent=intent,
-        agent=agent_name,
-        status=result.status.value,
-        output=result.output,
-        tokens_used=result.tokens_used,
-        latency_ms=result.latency_ms,
-        error=result.error,
+        pipeline=bool(pipeline_steps),
+        agents_called=agents_called,
+        results=[
+            AgentResultOut(
+                task_id=r.task_id,
+                agent_name=r.agent_name,
+                status=r.status.value,
+                output=r.output,
+                tokens_used=r.tokens_used,
+                latency_ms=r.latency_ms,
+                error=r.error,
+            )
+            for r in results
+        ],
+        total_tokens=total_tokens,
+        total_latency_ms=total_latency,
     )
 
 
@@ -118,8 +168,34 @@ async def agent_chat(
 
 @router.get("/intents")
 def list_intents() -> dict:
-    """Returns all supported intents and their target agents."""
     return {
         "intents": manager_agent.describe(),
+        "pipelines": manager_agent.describe_pipelines(),
         "agents": workflow_engine.list_agents(),
+        "cache_stats": llm_cache.stats(),
     }
+
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+
+@router.get("/logs")
+def get_agent_logs(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> dict:
+    """Return recent agent call logs for the current user."""
+    logs = AgentLogger.get_recent(db, current_user["user_id"], limit=limit)
+    return {"logs": logs}
+
+
+# ── Memory management ────────────────────────────────────────────────────────
+
+@router.delete("/memory")
+def clear_memory(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> dict:
+    """Clear conversation memory for the current user."""
+    AgentMemory(db, current_user["user_id"]).clear()
+    return {"status": "memory cleared"}

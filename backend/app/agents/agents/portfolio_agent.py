@@ -18,9 +18,9 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List
 
-from backend.app.agents.core.base import AgentResult, AgentStatus, AgentTask, BaseAgent
-from backend.app.agents.core.llm_client import LLMClient, LLMError
-from backend.app.agents.tools.tools import ToolRegistry
+from app.agents.core.base import AgentResult, AgentStatus, AgentTask, BaseAgent
+from app.agents.core.llm_client import LLMClient, LLMError
+from app.agents.tools.tools import ToolRegistry
 
 log = logging.getLogger(__name__)
 
