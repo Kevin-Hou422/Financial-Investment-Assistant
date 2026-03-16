@@ -11,6 +11,8 @@ import PlanManager from './components/PlanManager';
 import WatchlistPage from './components/WatchlistPage';
 import AlertsPage from './components/AlertsPage';
 import NewsPage from './components/NewsPage';
+import AIChatPage from './components/AIChatPage';
+import AIStrategyPage from './components/AIStrategyPage';
 
 function AppInner() {
   const { user, loading } = useAuth();
@@ -41,6 +43,8 @@ function AppInner() {
           <Route path="/watchlist" element={<WatchlistPage />} />
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/news" element={<NewsPage />} />
+          <Route path="/ai-chat" element={<AIChatPage />} />
+          <Route path="/ai-strategy" element={<AIStrategyPage />} />
         </Routes>
       </div>
     </div>

@@ -34,3 +34,10 @@ export const deleteAsset = (id) => api.delete(`/assets/${id}`);
 
 // ─── Strategy ─────────────────────────────────────────────────────────────────
 export const getStrategy = () => api.get('/strategy');
+
+// ─── Agent (multi-agent chat) ─────────────────────────────────────────────────
+export const agentChat    = (message, token_budget = 600) => api.post('/agent/chat', { message, token_budget });
+export const agentLogs    = (limit = 50) => api.get(`/agent/logs?limit=${limit}`);
+export const agentIntents = () => api.get('/agent/intents');
+export const clearMemory  = () => api.delete('/agent/memory');
+export const keyUsage     = () => api.get('/agent/keys/usage');
