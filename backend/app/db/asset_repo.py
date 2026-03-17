@@ -9,14 +9,24 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Asset
 
+_EXCHANGE_CURRENCY: Dict[str, str] = {
+    "US": "USD", "HK": "HKD", "AShare": "CNY",
+    "Domestic": "CNY", "International": "USD",
+    "Spot": "USD", "Government": "USD", "Corporate": "USD",
+    "Major": "USD", "Cross": "USD", "Other": "USD",
+}
+
 
 def _row_to_dict(a: Asset) -> Dict:
+    exchange = a.exchange or "US"
+    currency = _EXCHANGE_CURRENCY.get(exchange, "USD")
     return {
         "id": a.id,
         "user_id": a.user_id,
         "name": a.name,
         "type": a.type,
-        "exchange": a.exchange or "",
+        "exchange": exchange,
+        "currency": currency,
         "quantity": a.quantity,
         "price": a.price,
         "total_value": a.total_value,

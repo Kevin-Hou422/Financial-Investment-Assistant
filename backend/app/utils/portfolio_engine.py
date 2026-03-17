@@ -6,6 +6,25 @@ from app.external.fund_api import fetch_fund_price
 from app.external.gold_api import fetch_gold_price
 from app.external.stock_api import fetch_stock_price
 
+# Approximate FX rates to USD (updated periodically)
+_FX_TO_USD: Dict[str, float] = {
+    "USD": 1.0, "HKD": 0.1282, "CNY": 0.1380,
+    "EUR": 1.08, "GBP": 1.27,
+}
+
+_EXCHANGE_CURRENCY: Dict[str, str] = {
+    "US": "USD", "HK": "HKD", "AShare": "CNY",
+    "Domestic": "CNY", "International": "USD",
+    "Spot": "USD", "Government": "USD", "Corporate": "USD",
+    "Major": "USD", "Cross": "USD", "Other": "USD",
+}
+
+
+def _to_usd(value: float, exchange: str) -> float:
+    currency = _EXCHANGE_CURRENCY.get(exchange, "USD")
+    rate = _FX_TO_USD.get(currency, 1.0)
+    return value * rate
+
 
 def _resolve_price_for_asset(asset: Dict[str, Any]) -> Tuple[float, float]:
     """
@@ -41,7 +60,8 @@ def _resolve_price_for_asset(asset: Dict[str, Any]) -> Tuple[float, float]:
 
     cost_value = quantity * buy_price
     current_value = quantity * current_price
-    return cost_value, current_value
+    exchange = asset.get("exchange", "US") or "US"
+    return _to_usd(cost_value, exchange), _to_usd(current_value, exchange)
 
 
 def calculate_portfolio_overview(assets: List[Dict[str, Any]]) -> Dict[str, Any]:

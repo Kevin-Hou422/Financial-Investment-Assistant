@@ -1,3 +1,25 @@
+export const EXCHANGE_CURRENCY = {
+  US:            { code: 'USD', symbol: '$',    label: 'USD' },
+  HK:            { code: 'HKD', symbol: 'HK$',  label: 'HKD' },
+  AShare:        { code: 'CNY', symbol: '¥',    label: 'CNY' },
+  Domestic:      { code: 'CNY', symbol: '¥',    label: 'CNY' },
+  International: { code: 'USD', symbol: '$',    label: 'USD' },
+  Spot:          { code: 'USD', symbol: '$',    label: 'USD' },
+  Government:    { code: 'USD', symbol: '$',    label: 'USD' },
+  Corporate:     { code: 'USD', symbol: '$',    label: 'USD' },
+  Major:         { code: 'USD', symbol: '$',    label: 'USD' },
+  Cross:         { code: 'USD', symbol: '$',    label: 'USD' },
+  Other:         { code: 'USD', symbol: '$',    label: 'USD' },
+};
+
+export const FX_RATES_TO_USD = {
+  USD: 1.0,
+  HKD: 0.1282,
+  CNY: 0.1380,
+  EUR: 1.08,
+  GBP: 1.27,
+};
+
 export const ASSET_TYPE_CATEGORIES = {
   Stock: [
     { value: 'US', label: 'US Stocks' },

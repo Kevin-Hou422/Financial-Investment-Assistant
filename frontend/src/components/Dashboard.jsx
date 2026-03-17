@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { getAssets } from '../services/api';
 import { formatCurrency } from '../utils/helpers';
+import { getDashboardCache, setDashboardCache } from '../utils/dashboardCache';
 import PlaceholderChart from './PlaceholderChart';
 import MarketTickerPanel from './MarketTickerPanel';
 import RiskAnalysisPanel from './RiskAnalysisPanel';
@@ -35,27 +36,35 @@ export default function Dashboard() {
   const [overview, setOverview] = useState({ total_cost: 0, total_current_value: 0, pnl_amount: 0, pnl_pct: 0 });
   const [risk, setRisk] = useState({ volatility: 0, max_drawdown: 0 });
 
-  useEffect(() => { getAssets().then((res) => setAssets(res.data)); }, []);
-
   useEffect(() => {
-    const load = async () => {
-      try {
-        const { default: api } = await import('../services/api');
-        const res = await api.get('/portfolio/summary');
-        setOverview(res.data);
-      } catch {}
-    };
-    load();
-  }, []);
+    const cached = getDashboardCache();
+    if (cached) {
+      if (cached.assets)   setAssets(cached.assets);
+      if (cached.overview) setOverview(cached.overview);
+      if (cached.risk)     setRisk(cached.risk);
+      return;
+    }
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await riskService.getMetrics();
-        setRisk({ volatility: data.volatility || 0, max_drawdown: data.max_drawdown || 0 });
-      } catch {}
+    const fetchAll = async () => {
+      const results = await Promise.allSettled([
+        getAssets(),
+        (async () => { const { default: api } = await import('../services/api'); return api.get('/portfolio/summary'); })(),
+        (async () => riskService.getMetrics())(),
+      ]);
+
+      const newAssets   = results[0].status === 'fulfilled' ? results[0].value.data : [];
+      const newOverview = results[1].status === 'fulfilled' ? results[1].value.data : { total_cost: 0, total_current_value: 0, pnl_amount: 0, pnl_pct: 0 };
+      const newRisk     = results[2].status === 'fulfilled'
+        ? { volatility: results[2].value.volatility || 0, max_drawdown: results[2].value.max_drawdown || 0 }
+        : { volatility: 0, max_drawdown: 0 };
+
+      setAssets(newAssets);
+      setOverview(newOverview);
+      setRisk(newRisk);
+      setDashboardCache({ assets: newAssets, overview: newOverview, risk: newRisk });
     };
-    load();
+
+    fetchAll();
   }, []);
 
   const typeData = assets.reduce((acc, curr) => {

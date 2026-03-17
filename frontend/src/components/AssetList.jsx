@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getAssets, deleteAsset, createAsset, updateAsset } from '../services/api';
 import AssetForm from './AssetForm';
-import { formatCurrency } from '../utils/helpers';
+import { formatCurrencyForExchange } from '../utils/helpers';
 import { ASSET_TYPES, ASSET_TYPE_CATEGORIES } from '../utils/assetCategories';
+import { invalidateDashboardCache } from '../utils/dashboardCache';
 
 export default function AssetList() {
   const [assets, setAssets] = useState([]);
@@ -25,6 +26,7 @@ export default function AssetList() {
     if (!window.confirm('Are you sure you want to delete this asset?')) return;
     try {
       await deleteAsset(id);
+      invalidateDashboardCache();
       loadAssets();
     } catch (e) {
       // Surface backend error to the user
@@ -44,6 +46,7 @@ export default function AssetList() {
       } else {
         await createAsset(data);
       }
+      invalidateDashboardCache();
       loadAssets();
     } catch (e) {
       const message =
@@ -121,8 +124,8 @@ export default function AssetList() {
                     <td className="p-3"><span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded">{a.type}</span></td>
                     <td className="p-3 text-sm text-slate-600">{a.exchange || '-'}</td>
                     <td className="p-3">{a.quantity}</td>
-                    <td className="p-3">{formatCurrency(a.price)}</td>
-                    <td className="p-3 font-semibold text-gray-700">{formatCurrency(a.total_value)}</td>
+                    <td className="p-3">{formatCurrencyForExchange(a.price, a.exchange)}</td>
+                    <td className="p-3 font-semibold text-gray-700">{formatCurrencyForExchange(a.total_value, a.exchange)}</td>
                     <td className="p-3 text-gray-500">{a.buy_date}</td>
                     <td className="p-3 text-right">
                     <button onClick={() => setEditingAsset(a)} className="text-blue-500 hover:text-blue-700 mr-4 font-medium">Edit</button>
