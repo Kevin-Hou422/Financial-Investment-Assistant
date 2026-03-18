@@ -8,6 +8,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.db.models import Asset
+from app.external.fx_api import get_fx_rates
 
 _EXCHANGE_CURRENCY: Dict[str, str] = {
     "US": "USD", "HK": "HKD", "AShare": "CNY",

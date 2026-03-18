@@ -59,11 +59,11 @@ class WorkflowEngine:
         except Exception:
             return None
 
-    def _make_memory(self, db: Optional[Session], user_id: str) -> Optional[AgentMemory]:
+    def _make_memory(self, db: Optional[Session], user_id: str, session_id: str = "") -> Optional[AgentMemory]:
         if db is None:
             return None
         try:
-            return AgentMemory(db, user_id)
+            return AgentMemory(db, user_id, session_id)
         except Exception:
             return None
 
@@ -76,6 +76,7 @@ class WorkflowEngine:
         tools: ToolRegistry,
         db: Optional[Session] = None,
         user_id: str = "",
+        session_id: str = "",
     ) -> AgentResult:
         """Dispatch a single task to one agent, with logging."""
         registry = self._get_registry()
@@ -87,8 +88,7 @@ class WorkflowEngine:
                 error=f"Agent '{agent_name}' not registered.",
             )
 
-        # Inject memory context into task
-        memory = self._make_memory(db, user_id)
+        memory = self._make_memory(db, user_id, session_id)
         if memory:
             history = memory.load()
             if history:
@@ -124,6 +124,7 @@ class WorkflowEngine:
         tools: ToolRegistry,
         db: Optional[Session] = None,
         user_id: str = "",
+        session_id: str = "",
     ) -> List[AgentResult]:
         """
         Sequential pipeline: each step receives the previous result in context.
@@ -133,8 +134,7 @@ class WorkflowEngine:
         ctx = dict(base_task.context)
         agent_logger = self._make_logger(db, user_id)
 
-        # Load memory once and inject into first step
-        memory = self._make_memory(db, user_id)
+        memory = self._make_memory(db, user_id, session_id)
         if memory:
             ctx["conversation_history"] = memory.load()
 

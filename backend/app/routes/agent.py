@@ -72,6 +72,7 @@ def agent_risk_analysis(
 class ChatRequest(BaseModel):
     message: str
     token_budget: Optional[int] = 600
+    session_id: Optional[str] = None
 
 
 class AgentResultOut(BaseModel):
@@ -136,11 +137,13 @@ async def agent_chat(
         results = await workflow_engine.run_pipeline(
             steps=pipeline_steps, base_task=base_task,
             tools=tools, db=db, user_id=user_id,
+            session_id=req.session_id or "",
         )
     else:
         result = await workflow_engine.run_single(
             agent_name=agent_name, task=base_task,
             tools=tools, db=db, user_id=user_id,
+            session_id=req.session_id or "",
         )
         results = [result]
 
@@ -207,8 +210,14 @@ def get_agent_logs(
 
 @router.delete("/memory")
 def clear_memory(
+    session_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> dict:
-    AgentMemory(db, current_user.id).clear()
-    return {"status": "memory cleared"}
+    mem = AgentMemory(db, current_user.id, session_id or "")
+    if session_id:
+        mem.clear()
+        return {"status": "session memory cleared", "session_id": session_id}
+    else:
+        mem.clear_all()
+        return {"status": "all memory cleared"}

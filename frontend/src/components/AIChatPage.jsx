@@ -298,7 +298,11 @@ export default function AIChatPage() {
     setLoading(true);
 
     try {
-      const res = await api.post('/agent/chat', { message: trimmed, token_budget: 600 });
+      const res = await api.post('/agent/chat', {
+        message: trimmed,
+        token_budget: 600,
+        session_id: currentId,
+      });
       const aiMsg = { id: genId(), role: 'assistant', type: 'agent', data: res.data };
       setSessions((prev) => {
         const updated = prev.map((s) => {
@@ -333,17 +337,18 @@ export default function AIChatPage() {
   };
 
   const clearMemory = async () => {
-    try { await api.delete('/agent/memory'); } catch {}
-    if (activeId) {
-      const welcomeMsg = makeWelcomeMsg();
-      setSessions((prev) => {
-        const updated = prev.map((s) =>
-          s.id === activeId ? { ...s, messages: [welcomeMsg], updatedAt: Date.now() } : s
-        );
-        saveSessions(updated);
-        return updated;
-      });
-    }
+    if (!activeId) return;
+    try {
+      await api.delete(`/agent/memory?session_id=${encodeURIComponent(activeId)}`);
+    } catch {}
+    const welcomeMsg = makeWelcomeMsg();
+    setSessions((prev) => {
+      const updated = prev.map((s) =>
+        s.id === activeId ? { ...s, messages: [welcomeMsg], updatedAt: Date.now() } : s
+      );
+      saveSessions(updated);
+      return updated;
+    });
   };
 
   const formatTime = (ts) => {
@@ -434,11 +439,12 @@ export default function AIChatPage() {
               New Chat
             </button>
             <button onClick={clearMemory}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all border border-gray-700 hover:border-rose-500/30">
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all border border-gray-700 hover:border-rose-500/30"
+              title="Clear AI memory for this conversation only">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
-              Clear Memory
+              Clear Session Memory
             </button>
           </div>
         </div>

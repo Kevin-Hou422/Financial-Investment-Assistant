@@ -483,7 +483,7 @@ The manager agent uses zero-token keyword scoring (no LLM call) to classify 8 in
 | Cache capacity | 500 entries |
 | Cache key | SHA-256(model + messages + max_tokens) |
 | Default token budget | 600 tokens/request |
-| Memory per user | Last 10 turns (30-day TTL) |
+| Memory per user | Last 10 turns per *session* (30-day TTL), isolated by session_id |
 
 ---
 
@@ -633,9 +633,9 @@ The platform supports multi-currency asset entry with automatic USD conversion f
 2. **Storage**: Asset prices are stored in native currency (no conversion on write)
 3. **Asset list**: Prices and values displayed in native currency using `Intl.NumberFormat`
 4. **Dashboard totals**: Backend `portfolio_engine._to_usd()` converts all values to USD before summing
-5. **FX rates**: Static approximations in `assetCategories.js` (frontend) and `portfolio_engine.py` (backend)
+5. **FX rates**: Fetched live from `open.er-api.com` (free, no key) with 1-hour backend cache. Fallback to hardcoded values if API is unreachable. Frontend caches in `localStorage` for 1 hour.
 
-> **Note**: FX rates are static approximations. For production, integrate a live FX rate API (e.g., Fixer.io, ECB Data Portal, Open Exchange Rates).
+> **Note**: For the most accurate FX rates in production, consider integrating a dedicated FX API (e.g., Fixer.io, Bloomberg FX) with minute-level granularity.
 
 ---
 
@@ -686,24 +686,28 @@ Login:    email + password -> verify bcrypt hash -> JWT (7d)
 ## 15. Known Limitations & Roadmap
 
 ### Current Limitations
-- **Static FX rates**: HKD/CNY rates are hardcoded approximations (update manually as needed)
-- **SQLite**: Suitable for single-user/development. Should migrate to PostgreSQL for production multi-user scale
-- **No real-time push**: Market prices require manual navigation/refresh; no WebSocket streaming
+- **SQLite**: Not suitable for production multi-user scale; should migrate to PostgreSQL
 - **Google OAuth**: Requires a real verified domain and configured OAuth consent screen for production
 - **yfinance reliability**: Occasionally returns stale data or hits rate limits on burst requests
-- **Agent memory is per-user global**: No per-session memory isolation (all chats share the same memory store)
+- **No mobile-responsive layout**: Designed primarily for desktop browsers
+
+### Previously Fixed
+| Issue | Resolution |
+|---|---|
+| Static FX rates | `fx_api.py` fetches live rates from open.er-api.com with 1-hour cache; fallback to hardcoded values on failure |
+| No real-time market prices | WebSocket endpoint (`/api/ws/prices`) streams major index ticker updates every 15 s; frontend `useMarketWebSocket` hook with auto-reconnect |
+| Per-user global agent memory | `AgentMemory` now scoped to `(user_id, session_id)`; each chat session has isolated context; `DELETE /api/agent/memory?session_id=xxx` clears one session |
 
 ### Roadmap
-- [ ] Live FX rate integration (Fixer.io, Open Exchange Rates, or ECB API)
 - [ ] PostgreSQL migration with Alembic schema migrations
-- [ ] WebSocket price streaming for real-time portfolio value updates
-- [ ] Time-weighted return (TWR) calculation for accurate performance attribution
+- [ ] Portfolio value WebSocket streaming (price refresh for user assets on demand)
 - [ ] Mobile-responsive layout improvements
 - [ ] CSV/Excel export for assets and cashflows
 - [ ] Semantic agent memory search (vector embeddings for long-term context retrieval)
 - [ ] Additional LLM providers (Anthropic Claude, Google Gemini) via provider abstraction layer
 - [ ] Portfolio backtesting module
 - [ ] Tax lot tracking and capital gains reporting
+- [ ] Automated FX rate alerts (notify when rate moves significantly)
 
 ---
 

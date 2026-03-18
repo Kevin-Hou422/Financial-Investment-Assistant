@@ -6,11 +6,7 @@ from app.external.fund_api import fetch_fund_price
 from app.external.gold_api import fetch_gold_price
 from app.external.stock_api import fetch_stock_price
 
-# Approximate FX rates to USD (updated periodically)
-_FX_TO_USD: Dict[str, float] = {
-    "USD": 1.0, "HKD": 0.1282, "CNY": 0.1380,
-    "EUR": 1.08, "GBP": 1.27,
-}
+from app.external.fx_api import get_fx_rates
 
 _EXCHANGE_CURRENCY: Dict[str, str] = {
     "US": "USD", "HK": "HKD", "AShare": "CNY",
@@ -22,7 +18,7 @@ _EXCHANGE_CURRENCY: Dict[str, str] = {
 
 def _to_usd(value: float, exchange: str) -> float:
     currency = _EXCHANGE_CURRENCY.get(exchange, "USD")
-    rate = _FX_TO_USD.get(currency, 1.0)
+    rate = get_fx_rates().get(currency, 1.0)
     return value * rate
 
 
