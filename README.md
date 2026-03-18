@@ -92,6 +92,11 @@ The system is designed for individual investors who want institutional-quality a
 - Income/expense cashflow logging with net flow analysis
 - Report export panel
 
+### Watchlist & Alerts
+- Add any specific asset to watchlist to track its changes
+- Set alerts for any specific asset
+- Get immediate notification when prices hit your target
+
 ---
 
 ## 3. System Architecture
