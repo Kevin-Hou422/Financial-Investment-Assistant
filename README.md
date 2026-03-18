@@ -680,6 +680,8 @@ Login:    email + password -> verify bcrypt hash -> JWT (7d)
 | Vite /api proxy | `vite.config.js` | No CORS preflight in development |
 | Recharts explicit minHeight | All chart containers | Prevents layout recalculation + console warnings |
 | Deterministic projection noise | `AIStrategyPage.jsx` | Seeded random = stable chart across re-renders |
+| **Server-wide price cache** | `utils/price_cache.py` | 12 s TTL for WS ticker; 3 min TTL for portfolio P&L; last-known fallback on yfinance error; thread-safe (RLock) |
+| **yfinance retry** | `external/stock_api.py` | Up to 3 attempts per symbol with 0.4 s linear backoff before falling back to cache |
 
 ---
 
@@ -688,15 +690,15 @@ Login:    email + password -> verify bcrypt hash -> JWT (7d)
 ### Current Limitations
 - **SQLite**: Not suitable for production multi-user scale; should migrate to PostgreSQL
 - **Google OAuth**: Requires a real verified domain and configured OAuth consent screen for production
-- **yfinance reliability**: Occasionally returns stale data or hits rate limits on burst requests
 - **No mobile-responsive layout**: Designed primarily for desktop browsers
 
 ### Previously Fixed
 | Issue | Resolution |
 |---|---|
 | Static FX rates | `fx_api.py` fetches live rates from open.er-api.com with 1-hour cache; fallback to hardcoded values on failure |
-| No real-time market prices | WebSocket endpoint (`/api/ws/prices`) streams major index ticker updates every 15 s; frontend `useMarketWebSocket` hook with auto-reconnect |
+| No real-time market prices | WebSocket endpoint (`/api/ws/prices`) streams major index ticker updates every 15 s; frontend `useMarketWebSocket` hook with auto-reconnect; Vite HMR conflict resolved by direct-connecting to backend port in dev |
 | Per-user global agent memory | `AgentMemory` now scoped to `(user_id, session_id)`; each chat session has isolated context; `DELETE /api/agent/memory?session_id=xxx` clears one session |
+| yfinance rate limits / stale data | Server-wide `price_cache.py` (12 s TTL for ticker, 3 min for portfolio); individual per-symbol fetch with 2 retries + linear backoff; last-known-value fallback prevents null prices on transient failures |
 
 ### Roadmap
 - [ ] PostgreSQL migration with Alembic schema migrations

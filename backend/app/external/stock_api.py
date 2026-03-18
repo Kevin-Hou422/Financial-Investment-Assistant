@@ -3,6 +3,10 @@ from typing import Any, Dict, Optional
 
 import yfinance as yf
 
+from app.utils import price_cache
+
+_PORTFOLIO_TTL = price_cache.PORTFOLIO_TTL  # 3 minutes
+
 
 def build_yf_symbol(symbol: str, exchange: Optional[str] = None) -> str:
     """
@@ -18,13 +22,11 @@ def build_yf_symbol(symbol: str, exchange: Optional[str] = None) -> str:
     if exchange == "US" or not exchange:
         return symbol
     if exchange == "HK":
-        # yfinance HK: 0700.HK (4 digits with leading zero)
         base = symbol.split(".")[0]
         if base.isdigit():
             base = base.zfill(4)
         return f"{base}.HK"
     if exchange == "AShare":
-        # Shanghai 6xxxxx -> .SS, Shenzhen 0xxxxx/3xxxxx -> .SZ
         base = symbol.split(".")[0]
         if not base.isdigit():
             return f"{symbol}.SS"
@@ -46,50 +48,77 @@ def fetch_stock_price(
     exchange: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    获取股票 / ETF / 基金等价格。exchange 用于解析标的：
-    US / HK / AShare 对应美股、港股、A股，会拼成 yfinance 所需代码（如 0700.HK, 600519.SS）。
+    Fetch stock/ETF/fund price via yfinance with server-wide price cache.
 
-    目前通过 yfinance.fast_info 获取最新价格和昨收，返回结构化 JSON：
-    {
-        "symbol": "AAPL",
-        "asset_type": "stock",
-        "price": 189.2,
-        "change_pct": 1.23,
-        "previous_close": 186.9,
-        "timestamp": "2026-03-04T10:20:30Z",
-        "error": null
-    }
+    Cache behaviour:
+      - Returns cached data (up to 3 minutes old) without hitting yfinance.
+      - On yfinance failure returns the last known cached price rather than null,
+        preventing portfolio total gaps due to transient API errors.
+
+    Returns a dict with keys:
+      symbol, asset_type, exchange, price, previous_close, change_pct,
+      timestamp, error, cached (bool).
     """
     yf_symbol = build_yf_symbol(symbol, exchange)
-    try:
-        ticker = yf.Ticker(yf_symbol)
-        data = ticker.fast_info
+    cache_key = yf_symbol.upper()
 
-        # yfinance fast_info 字段在不同市场可能略有差异，这里做防御式读取
-        last_price = float(getattr(data, "last_price", 0.0) or 0.0)
-        previous_close = getattr(data, "previous_close", None)
-        previous_close = float(previous_close) if previous_close not in (None, 0) else None
-
-        change_pct = _safe_change_pct(last_price, previous_close)
-
+    # ── 1. Serve from cache if fresh ──────────────────────────────────────────
+    cached = price_cache.get(cache_key, ttl=_PORTFOLIO_TTL)
+    if cached:
         return {
-            "symbol": yf_symbol,
-            "asset_type": asset_type,
-            "exchange": exchange,
-            "price": last_price if last_price else None,
-            "previous_close": previous_close,
-            "change_pct": change_pct,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "error": None,
-        }
-    except Exception as exc:  # noqa: BLE001
-        return {
-            "symbol": yf_symbol,
-            "asset_type": asset_type,
-            "exchange": exchange,
-            "price": None,
+            "symbol":         yf_symbol,
+            "asset_type":     asset_type,
+            "exchange":       exchange,
+            "price":          cached["price"],
             "previous_close": None,
-            "change_pct": None,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "error": str(exc),
+            "change_pct":     cached["change_pct"],
+            "timestamp":      datetime.now(timezone.utc).isoformat(),
+            "error":          None,
+            "cached":         True,
         }
+
+    # ── 2. Fetch from yfinance (with 2 retries) ───────────────────────────────
+    import time
+    last_exc = None
+    for attempt in range(3):
+        try:
+            ticker = yf.Ticker(yf_symbol)
+            data   = ticker.fast_info
+
+            last_price     = float(getattr(data, "last_price", 0.0) or 0.0)
+            previous_close = getattr(data, "previous_close", None)
+            previous_close = float(previous_close) if previous_close not in (None, 0) else None
+            change_pct     = _safe_change_pct(last_price, previous_close)
+
+            if last_price:
+                price_cache.put(cache_key, last_price, change_pct or 0.0)
+
+            return {
+                "symbol":         yf_symbol,
+                "asset_type":     asset_type,
+                "exchange":       exchange,
+                "price":          last_price or None,
+                "previous_close": previous_close,
+                "change_pct":     change_pct,
+                "timestamp":      datetime.now(timezone.utc).isoformat(),
+                "error":          None,
+                "cached":         False,
+            }
+        except Exception as exc:
+            last_exc = exc
+            if attempt < 2:
+                time.sleep(0.4 * (attempt + 1))
+
+    # ── 3. Fall back to last known cached value ───────────────────────────────
+    stale = price_cache.get_last_known(cache_key)
+    return {
+        "symbol":         yf_symbol,
+        "asset_type":     asset_type,
+        "exchange":       exchange,
+        "price":          stale["price"] if stale else None,
+        "previous_close": None,
+        "change_pct":     stale["change_pct"] if stale else None,
+        "timestamp":      datetime.now(timezone.utc).isoformat(),
+        "error":          str(last_exc),
+        "cached":         bool(stale),
+    }

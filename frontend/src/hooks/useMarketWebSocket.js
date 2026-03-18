@@ -1,10 +1,24 @@
 /**
  * useMarketWebSocket — connects to WS /api/ws/prices, streams major market tickers.
  * Auto-reconnects with exponential backoff up to 30 s.
+ *
+ * WebSocket URL strategy:
+ *  - Development (Vite):  connect directly to backend port 8000 to avoid
+ *    conflicting with Vite's own HMR WebSocket client.
+ *  - Production:          use window.location.host (assumed behind a reverse proxy
+ *    that handles WS upgrade for /api/ws/* paths).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const RECONNECT_DELAYS = [1000, 2000, 5000, 10000, 30000];
+
+function buildWsUrl(token) {
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  // In Vite dev mode, bypass the HTTP proxy and connect directly to the backend.
+  // This prevents Vite's HMR client from receiving our WS upgrade request.
+  const host = import.meta.env.DEV ? 'localhost:8000' : window.location.host;
+  return `${proto}//${host}/api/ws/prices?token=${encodeURIComponent(token)}`;
+}
 
 export function useMarketWebSocket() {
   const [tickerData, setTickerData] = useState([]);
@@ -18,10 +32,8 @@ export function useMarketWebSocket() {
     const token = localStorage.getItem('ai_invest_token');
     if (!token) return;
 
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${proto}//${window.location.host}/api/ws/prices?token=${encodeURIComponent(token)}`;
-
-    const ws = new WebSocket(url);
+    const url = buildWsUrl(token);
+    const ws  = new WebSocket(url);
     wsRef.current = ws;
 
     ws.onopen = () => {
