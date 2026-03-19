@@ -18,7 +18,7 @@ async def get_market_price(
     asset_type: str = Query(
         "stock",
         description="Asset type: stock/fund/crypto/gold",
-        regex="^(stock|fund|crypto|gold)$",
+        pattern="^(stock|fund|crypto|gold)$",
     ),
     exchange: Optional[str] = Query(
         None,
