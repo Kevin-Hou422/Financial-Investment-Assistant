@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { getAssets, deleteAsset, createAsset, updateAsset } from '../services/api';
 import AssetForm from './AssetForm';
-import { formatCurrencyForExchange } from '../utils/helpers';
+import { formatCurrencyForExchange, formatCurrency, convertToUSD } from '../utils/helpers';
 import { ASSET_TYPES, ASSET_TYPE_CATEGORIES } from '../utils/assetCategories';
 import { invalidateDashboardCache } from '../utils/dashboardCache';
+
+const CURRENCY_DISPLAY_KEY = 'asset_currency_display_v1';
 
 export default function AssetList() {
   const [assets, setAssets] = useState([]);
@@ -11,6 +13,17 @@ export default function AssetList() {
   const [filterType, setFilterType] = useState('');
   const [filterExchange, setFilterExchange] = useState('');
   const [editingAsset, setEditingAsset] = useState(null);
+  const [showUSD, setShowUSD] = useState(() => {
+    try { return localStorage.getItem(CURRENCY_DISPLAY_KEY) === 'usd'; } catch { return false; }
+  });
+
+  const toggleCurrency = () => {
+    setShowUSD((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(CURRENCY_DISPLAY_KEY, next ? 'usd' : 'native'); } catch {}
+      return next;
+    });
+  };
 
   const loadAssets = () => {
     const params = {};
@@ -112,7 +125,24 @@ export default function AssetList() {
                 <th className="p-3 text-sm font-semibold text-gray-600">Category</th>
                 <th className="p-3 text-sm font-semibold text-gray-600">Quantity</th>
                 <th className="p-3 text-sm font-semibold text-gray-600">Buy Price</th>
-                <th className="p-3 text-sm font-semibold text-gray-600">Total Value</th>
+                <th className="p-3 text-sm font-semibold text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <span>Total Value</span>
+                    <button
+                      onClick={toggleCurrency}
+                      className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border transition-colors"
+                      style={showUSD
+                        ? { background: '#EEF2FF', color: '#4338CA', borderColor: '#A5B4FC' }
+                        : { background: '#F3F4F6', color: '#6B7280', borderColor: '#D1D5DB' }}
+                      title="Toggle between native currency and USD"
+                    >
+                      {showUSD ? '$ USD' : '≈ Native'}
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                      </svg>
+                    </button>
+                  </div>
+                </th>
                 <th className="p-3 text-sm font-semibold text-gray-600">Buy Date</th>
                 <th className="p-3 text-sm font-semibold text-gray-600 text-right">Actions</th>
                 </tr>
@@ -125,7 +155,11 @@ export default function AssetList() {
                     <td className="p-3 text-sm text-slate-600">{a.exchange || '-'}</td>
                     <td className="p-3">{a.quantity}</td>
                     <td className="p-3">{formatCurrencyForExchange(a.price, a.exchange)}</td>
-                    <td className="p-3 font-semibold text-gray-700">{formatCurrencyForExchange(a.total_value, a.exchange)}</td>
+                    <td className="p-3 font-semibold text-gray-700">
+                      {showUSD
+                        ? <span className="text-indigo-700">{formatCurrency(convertToUSD(a.total_value, a.exchange), 'USD')}</span>
+                        : formatCurrencyForExchange(a.total_value, a.exchange)}
+                    </td>
                     <td className="p-3 text-gray-500">{a.buy_date}</td>
                     <td className="p-3 text-right">
                     <button onClick={() => setEditingAsset(a)} className="text-blue-500 hover:text-blue-700 mr-4 font-medium">Edit</button>
