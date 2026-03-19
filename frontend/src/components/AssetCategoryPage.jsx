@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAssets, deleteAsset, createAsset, updateAsset } from '../services/api';
-import { formatCurrency } from '../utils/helpers';
+import { formatCurrency, formatCurrencyForExchange, convertToUSD, getCurrencyForExchange } from '../utils/helpers';
 import { ASSET_TYPE_CATEGORIES, SECTOR_CONFIG } from '../utils/assetCategories';
+import { invalidateDashboardCache } from '../utils/dashboardCache';
+
+const CURRENCY_DISPLAY_KEY = 'asset_currency_display_v1';
 
 const inputCls = 'bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2.5 outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400/40 placeholder:text-gray-500 w-full text-sm';
 const selectCls = 'bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2.5 outline-none focus:border-violet-400 w-full text-sm';
@@ -18,6 +21,9 @@ export default function AssetCategoryPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
   const [search, setSearch] = useState('');
+  const [showUSD, setShowUSD] = useState(() => {
+    try { return localStorage.getItem(CURRENCY_DISPLAY_KEY) === 'usd'; } catch { return false; }
+  });
   const [form, setForm] = useState({
     name: '',
     type,
@@ -26,6 +32,14 @@ export default function AssetCategoryPage() {
     price: '',
     buy_date: '',
   });
+
+  const toggleCurrency = () => {
+    setShowUSD((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(CURRENCY_DISPLAY_KEY, next ? 'usd' : 'native'); } catch {}
+      return next;
+    });
+  };
 
   const loadAssets = () => {
     const params = { type };
@@ -57,6 +71,7 @@ export default function AssetCategoryPage() {
       } else {
         await createAsset(payload);
       }
+      invalidateDashboardCache();
       resetForm();
       loadAssets();
     } catch (err) {
@@ -68,16 +83,35 @@ export default function AssetCategoryPage() {
     if (!window.confirm('Delete this asset?')) return;
     try {
       await deleteAsset(id);
+      invalidateDashboardCache();
       loadAssets();
     } catch (err) {
       alert(err?.response?.data?.detail || err?.message || 'Delete failed');
     }
   };
 
+  const formatValue = (value, exchange) => {
+    if (showUSD) {
+      return <span className="text-emerald-400">{formatCurrency(convertToUSD(value, exchange), 'USD')}</span>;
+    }
+    return formatCurrencyForExchange(value, exchange);
+  };
+
+  const nativeCurrencyLabel = (exchange) => {
+    const { code } = getCurrencyForExchange(exchange || activeExchange || '');
+    return code;
+  };
+
   const today = new Date().toISOString().split('T')[0];
   const filtered = assets.filter((a) =>
     a.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  const currentNativeCurrency = activeExchange
+    ? nativeCurrencyLabel(activeExchange)
+    : categories.length === 1
+    ? nativeCurrencyLabel(categories[0].value)
+    : null;
 
   return (
     <div className="space-y-6">
@@ -147,8 +181,15 @@ export default function AssetCategoryPage() {
                 value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
             </div>
             <div>
-              <label className="text-xs text-gray-400 mb-1 block">Buy Price</label>
-              <input required type="number" step="0.01" min="0.01" placeholder="0.00" className={inputCls}
+              <label className="text-xs text-gray-400 mb-1 block">
+                Buy Price
+                {form.exchange && (
+                  <span className={`ml-1.5 text-xs font-semibold ${cfg.accent}`}>
+                    ({getCurrencyForExchange(form.exchange).code})
+                  </span>
+                )}
+              </label>
+              <input required type="number" step="0.0001" min="0.0001" placeholder="0.00" className={inputCls}
                 value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
             </div>
             <div>
@@ -197,7 +238,24 @@ export default function AssetCategoryPage() {
               </button>
             ))}
           </div>
-          <div className="sm:ml-auto">
+          <div className="sm:ml-auto flex items-center gap-3">
+            <button
+              onClick={toggleCurrency}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all"
+              style={showUSD
+                ? { background: 'rgba(16,185,129,0.15)', color: '#34D399', borderColor: 'rgba(52,211,153,0.4)' }
+                : { background: 'rgba(107,114,128,0.15)', color: '#9CA3AF', borderColor: 'rgba(107,114,128,0.3)' }}
+              title="Toggle between native currency and USD"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+              {showUSD
+                ? '$ USD'
+                : currentNativeCurrency
+                  ? `${currentNativeCurrency} Native`
+                  : 'Native'}
+            </button>
             <input
               placeholder="Search..."
               className="bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-1.5 outline-none text-xs w-48 placeholder:text-gray-500 focus:border-gray-400"
@@ -214,8 +272,16 @@ export default function AssetCategoryPage() {
                 <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Name</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Category</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Qty</th>
-                <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Buy Price</th>
-                <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Value</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Buy Price
+                  {!showUSD && <span className="ml-1 text-gray-600 normal-case font-normal">(native)</span>}
+                </th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Value
+                  {showUSD
+                    ? <span className="ml-1 text-emerald-500/70 normal-case font-normal">(USD)</span>
+                    : <span className="ml-1 text-gray-600 normal-case font-normal">(native)</span>}
+                </th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Buy Date</th>
                 <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">Actions</th>
               </tr>
@@ -230,8 +296,14 @@ export default function AssetCategoryPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-300 text-sm">{a.quantity}</td>
-                  <td className="px-4 py-3 text-gray-300 text-sm">{formatCurrency(a.price)}</td>
-                  <td className="px-4 py-3 font-bold text-white text-sm">{formatCurrency(a.total_value)}</td>
+                  <td className="px-4 py-3 text-gray-300 text-sm">
+                    {showUSD
+                      ? <span className="text-emerald-400">{formatCurrency(convertToUSD(a.price, a.exchange), 'USD')}</span>
+                      : formatCurrencyForExchange(a.price, a.exchange)}
+                  </td>
+                  <td className="px-4 py-3 font-bold text-white text-sm">
+                    {formatValue(a.total_value, a.exchange)}
+                  </td>
                   <td className="px-4 py-3 text-gray-400 text-sm">{a.buy_date}</td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => setEditingAsset(a)}
