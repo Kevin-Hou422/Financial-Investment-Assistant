@@ -67,11 +67,13 @@ INTENT_TO_AGENT: Dict[str, str] = {
 # Complex intents dispatch an ordered list of agents.
 # Each step: {"agent": name, "token_budget": N}
 INTENT_TO_PIPELINE: Dict[str, List[Dict]] = {
-    # Full report: portfolio → risk → strategy
+    # Full report: portfolio + risk in parallel (independent), then strategy consumes both
     "full_report": [
-        {"agent": "portfolio_analyst", "token_budget": 500},
-        {"agent": "risk_analyst",      "token_budget": 400},
-        {"agent": "strategy_analyst",  "token_budget": 400},
+        {"parallel": [
+            {"agent": "portfolio_analyst", "token_budget": 500},
+            {"agent": "risk_analyst",      "token_budget": 400},
+        ]},
+        {"agent": "strategy_analyst", "token_budget": 400},
     ],
     # Rebalance: risk first, then strategy builds on it
     "rebalance_advice": [
@@ -113,11 +115,18 @@ class ManagerAgent:
     def describe(self) -> Dict[str, str]:
         return {intent: INTENT_TO_AGENT[intent] for intent in INTENT_KEYWORDS}
 
-    def describe_pipelines(self) -> Dict[str, List[str]]:
-        return {
-            intent: [step["agent"] for step in steps]
-            for intent, steps in INTENT_TO_PIPELINE.items()
-        }
+    def describe_pipelines(self) -> Dict[str, List]:
+        """Return human-readable pipeline shape (supports parallel groups)."""
+        result = {}
+        for intent, steps in INTENT_TO_PIPELINE.items():
+            described = []
+            for step in steps:
+                if "parallel" in step:
+                    described.append({"parallel": [s["agent"] for s in step["parallel"]]})
+                else:
+                    described.append(step["agent"])
+            result[intent] = described
+        return result
 
 
 # ── singleton ─────────────────────────────────────────────────────────────────

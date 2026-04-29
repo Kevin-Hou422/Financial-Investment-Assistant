@@ -127,37 +127,89 @@ class WorkflowEngine:
         session_id: str = "",
     ) -> List[AgentResult]:
         """
-        Sequential pipeline: each step receives the previous result in context.
-        Stops on first failure.
+        Mixed pipeline: each step is either a single agent or a parallel group.
+
+        Step formats:
+          {"agent": "name", "token_budget": N}          — sequential
+          {"parallel": [{"agent": ..., "token_budget": N}, ...]}  — concurrent fan-out
+
+        Context forwarding:
+          Sequential step output → ctx["{agent}_output"]
+          Parallel group: all outputs merged into ctx before the next step.
+          A parallel group only aborts if *all* agents in it fail.
+          A sequential step aborts the pipeline on any failure.
         """
         results: List[AgentResult] = []
         ctx = dict(base_task.context)
         agent_logger = self._make_logger(db, user_id)
+        registry = self._get_registry()
 
         memory = self._make_memory(db, user_id, session_id)
         if memory:
             ctx["conversation_history"] = memory.load()
 
         for step in steps:
-            task = AgentTask(
-                task_id=f"{base_task.task_id}_{step['agent']}",
-                agent_name=step["agent"],
-                intent=base_task.intent,
-                context=ctx,
-                token_budget=step.get("token_budget", base_task.token_budget),
-            )
-            result = await self.run_single(step["agent"], task, tools)
-            results.append(result)
+            # ── parallel group ────────────────────────────────────────────────
+            if "parallel" in step:
+                group: List[Dict] = step["parallel"]
 
-            if agent_logger:
-                agent_logger.record(result, intent=ctx.get("intent", ""))
+                async def _run_one_parallel(ps: Dict) -> AgentResult:
+                    agent = registry.get(ps["agent"])
+                    if agent is None:
+                        return AgentResult(
+                            task_id=f"{base_task.task_id}_{ps['agent']}",
+                            agent_name=ps["agent"],
+                            status=AgentStatus.FAILED,
+                            error=f"Agent '{ps['agent']}' not registered.",
+                        )
+                    t = AgentTask(
+                        task_id=f"{base_task.task_id}_{ps['agent']}",
+                        agent_name=ps["agent"],
+                        intent=base_task.intent,
+                        context=dict(ctx),
+                        token_budget=ps.get("token_budget", base_task.token_budget),
+                    )
+                    t0 = time.monotonic()
+                    r = await agent.run(t, tools)
+                    r.latency_ms = int((time.monotonic() - t0) * 1000)
+                    return r
 
-            if result.status == AgentStatus.FAILED:
-                log.warning("Pipeline aborted at step '%s': %s", step["agent"], result.error)
-                break
+                group_results: List[AgentResult] = list(
+                    await asyncio.gather(*[_run_one_parallel(ps) for ps in group])
+                )
 
-            # Pass output forward as context for next step
-            ctx = {**ctx, f"{step['agent']}_output": result.output}
+                for r in group_results:
+                    results.append(r)
+                    if agent_logger:
+                        agent_logger.record(r, intent=ctx.get("intent", ""))
+                    if r.status == AgentStatus.DONE:
+                        ctx = {**ctx, f"{r.agent_name}_output": r.output}
+
+                all_failed = all(r.status == AgentStatus.FAILED for r in group_results)
+                if all_failed:
+                    log.warning("Pipeline aborted: entire parallel group failed.")
+                    break
+
+            # ── sequential step ───────────────────────────────────────────────
+            else:
+                task = AgentTask(
+                    task_id=f"{base_task.task_id}_{step['agent']}",
+                    agent_name=step["agent"],
+                    intent=base_task.intent,
+                    context=ctx,
+                    token_budget=step.get("token_budget", base_task.token_budget),
+                )
+                result = await self.run_single(step["agent"], task, tools)
+                results.append(result)
+
+                if agent_logger:
+                    agent_logger.record(result, intent=ctx.get("intent", ""))
+
+                if result.status == AgentStatus.FAILED:
+                    log.warning("Pipeline aborted at step '%s': %s", step["agent"], result.error)
+                    break
+
+                ctx = {**ctx, f"{step['agent']}_output": result.output}
 
         # Save memory after pipeline completes
         if memory:

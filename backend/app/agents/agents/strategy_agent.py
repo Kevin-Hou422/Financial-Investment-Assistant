@@ -1,20 +1,21 @@
 """
-StrategyAnalystAgent — investment strategy and rebalancing agent.
-
-Responsibilities:
-  - Generate rebalancing recommendations based on target allocation rules
-  - Suggest strategy adjustments given risk profile + goals
-  - Provide actionable buy/sell/hold guidance
+StrategyAnalystAgent — rebalancing plans and buy/sell/hold recommendations.
 
 Typically runs after RiskAnalystAgent in a pipeline, consuming its output.
+
+Changes vs original:
+  - _gather_data() offloaded via asyncio.to_thread.
+  - LLM output validated against StrategyOutput schema.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Dict, List
 
 from app.agents.core.base import AgentResult, AgentStatus, AgentTask, BaseAgent
 from app.agents.core.llm_client import LLMClient, LLMError
+from app.agents.core.output_schemas import StrategyOutput, coerce_output
 from app.agents.tools.tools import ToolRegistry
 
 log = logging.getLogger(__name__)
@@ -29,9 +30,9 @@ Rules:
 
 
 def _build_strategy_prompt(data: Dict) -> str:
-    port = data.get("portfolio", {})
+    port     = data.get("portfolio", {})
     risk_out = data.get("risk_analyst_output", {})
-    goals = data.get("goals", [])[:5]
+    goals    = data.get("goals", [])[:5]
     cashflow = data.get("cashflow", {})
     return f"""Develop an investment strategy plan and reply with:
 {{"strategy_type": "conservative|balanced|aggressive",
@@ -58,12 +59,18 @@ class StrategyAnalystAgent(BaseAgent):
     def __init__(self) -> None:
         self._llm = LLMClient()
 
-    async def run(self, task: AgentTask, tools: ToolRegistry) -> AgentResult:
+    def _gather_data(self, task: AgentTask, tools: ToolRegistry) -> Dict[str, Any]:
         data: Dict[str, Any] = {"question": task.intent}
+        data["portfolio"] = tools.get_portfolio_snapshot()
+        data["goals"]     = tools.get_goals_snapshot()
+        data["cashflow"]  = tools.get_cashflow_snapshot()
+        # Consume upstream risk output if in pipeline
+        data["risk_analyst_output"] = task.context.get("risk_analyst_output", {})
+        return data
+
+    async def run(self, task: AgentTask, tools: ToolRegistry) -> AgentResult:
         try:
-            data["portfolio"] = tools.get_portfolio_snapshot()
-            data["goals"]     = tools.get_goals_snapshot()
-            data["cashflow"]  = tools.get_cashflow_snapshot()
+            data = await asyncio.to_thread(self._gather_data, task, tools)
         except Exception as exc:
             log.warning("StrategyAnalystAgent tool error: %s", exc)
             return AgentResult(
@@ -71,22 +78,23 @@ class StrategyAnalystAgent(BaseAgent):
                 status=AgentStatus.FAILED, error=f"Tool error: {exc}",
             )
 
-        # Consume upstream risk output if in pipeline
-        data["risk_analyst_output"] = task.context.get("risk_analyst_output", {})
-
         messages: List[Dict[str, str]] = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user",   "content": _build_strategy_prompt(data)},
         ]
 
         try:
-            output, tokens = await self._llm.complete(messages, max_tokens=task.token_budget, db=tools._db)
+            raw_output, tokens = await self._llm.complete(
+                messages, max_tokens=task.token_budget, db=tools._db
+            )
         except LLMError as exc:
             log.error("StrategyAnalystAgent LLM error: %s", exc)
             return AgentResult(
                 task_id=task.task_id, agent_name=self.name,
                 status=AgentStatus.FAILED, error=str(exc),
             )
+
+        output = coerce_output(raw_output, StrategyOutput)
 
         return AgentResult(
             task_id=task.task_id, agent_name=self.name,

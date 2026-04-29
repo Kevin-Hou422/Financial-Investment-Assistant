@@ -1,21 +1,21 @@
 """
-ResearchAnalystAgent — deep-dive research and performance review agent.
+ResearchAnalystAgent — performance ranking, best/worst, due-diligence flags.
 
-Responsibilities:
-  - Rank assets by return performance
-  - Identify best/worst performers and diagnose causes
-  - Suggest areas for deeper due-diligence
+Typically called for 'performance_review' intent or after PortfolioAnalystAgent.
 
-Typically called for 'performance_review' intent.
-Can be chained after PortfolioAnalystAgent in a pipeline.
+Changes vs original:
+  - _gather_data() offloaded via asyncio.to_thread.
+  - LLM output validated against ResearchOutput schema.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Dict, List
 
 from app.agents.core.base import AgentResult, AgentStatus, AgentTask, BaseAgent
 from app.agents.core.llm_client import LLMClient, LLMError
+from app.agents.core.output_schemas import ResearchOutput, coerce_output
 from app.agents.tools.tools import ToolRegistry
 
 log = logging.getLogger(__name__)
@@ -31,9 +31,9 @@ Rules:
 
 def _build_research_prompt(data: Dict) -> str:
     analytics = data.get("analytics", {})
-    assets = analytics.get("assets", [])[:5]
-    port = data.get("portfolio", {})
-    cashflow = data.get("cashflow", {})
+    assets    = analytics.get("assets", [])[:5]
+    port      = data.get("portfolio", {})
+    cashflow  = data.get("cashflow", {})
     return f"""Perform a performance research review and reply with:
 {{"performance_grade": "A|B|C|D|F",
   "top_performers": [{{"name": "<name>", "return_pct": <float>, "note": "<1 sentence>"}}],
@@ -56,12 +56,16 @@ class ResearchAnalystAgent(BaseAgent):
     def __init__(self) -> None:
         self._llm = LLMClient()
 
-    async def run(self, task: AgentTask, tools: ToolRegistry) -> AgentResult:
+    def _gather_data(self, task: AgentTask, tools: ToolRegistry) -> Dict[str, Any]:
         data: Dict[str, Any] = {"question": task.intent}
+        data["portfolio"] = tools.get_portfolio_snapshot()
+        data["analytics"] = tools.get_analytics_snapshot()
+        data["cashflow"]  = tools.get_cashflow_snapshot()
+        return data
+
+    async def run(self, task: AgentTask, tools: ToolRegistry) -> AgentResult:
         try:
-            data["portfolio"] = tools.get_portfolio_snapshot()
-            data["analytics"] = tools.get_analytics_snapshot()
-            data["cashflow"]  = tools.get_cashflow_snapshot()
+            data = await asyncio.to_thread(self._gather_data, task, tools)
         except Exception as exc:
             log.warning("ResearchAnalystAgent tool error: %s", exc)
             return AgentResult(
@@ -75,13 +79,17 @@ class ResearchAnalystAgent(BaseAgent):
         ]
 
         try:
-            output, tokens = await self._llm.complete(messages, max_tokens=task.token_budget, db=tools._db)
+            raw_output, tokens = await self._llm.complete(
+                messages, max_tokens=task.token_budget, db=tools._db
+            )
         except LLMError as exc:
             log.error("ResearchAnalystAgent LLM error: %s", exc)
             return AgentResult(
                 task_id=task.task_id, agent_name=self.name,
                 status=AgentStatus.FAILED, error=str(exc),
             )
+
+        output = coerce_output(raw_output, ResearchOutput)
 
         return AgentResult(
             task_id=task.task_id, agent_name=self.name,

@@ -149,22 +149,23 @@ async def ws_prices(websocket: WebSocket, token: Optional[str] = None):
     except Exception:
         return
 
-    last_ticker = time.time()
-    last_ping   = time.time()
+    # Track ping cadence relative to ticker fires
+    ticks_per_ping = _PING_INTERVAL // _TICKER_INTERVAL  # e.g. 45 // 15 = 3
+    tick_count = 0
 
     try:
         while True:
-            await asyncio.sleep(1)
+            # Sleep exactly one ticker interval — no 1-second polling needed
+            await asyncio.sleep(_TICKER_INTERVAL)
             now = time.time()
 
-            if now - last_ticker >= _TICKER_INTERVAL:
-                data = await asyncio.to_thread(_build_ticker_payload)
-                await websocket.send_json({"type": "ticker", "data": data, "ts": now})
-                last_ticker = now
+            data = await asyncio.to_thread(_build_ticker_payload)
+            await websocket.send_json({"type": "ticker", "data": data, "ts": now})
 
-            if now - last_ping >= _PING_INTERVAL:
+            tick_count += 1
+            if tick_count >= ticks_per_ping:
                 await websocket.send_json({"type": "ping", "ts": now})
-                last_ping = now
+                tick_count = 0
 
     except (WebSocketDisconnect, Exception) as exc:
         log.info("WS prices disconnected: user=%s (%s)", user_id, type(exc).__name__)

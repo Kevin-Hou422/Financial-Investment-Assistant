@@ -1,32 +1,30 @@
 """
-PortfolioAnalystAgent — example agent implementation.
+PortfolioAnalystAgent — portfolio overview, risk, performance, rebalance, goals.
 
 Workflow position: intent → manager → workflow → [this agent]
 
-Capabilities:
-  - portfolio_overview : summarise holdings, allocation, PnL
-  - risk_analysis      : volatility, drawdown, concentration flags
-  - performance_review : per-asset return ranking, best/worst
-  - rebalance_advice   : over/under-weight suggestions
-  - goal_tracking      : progress toward financial goals
-
-Token budget: default 600 per call. Prompts are templated to stay under 300
-input tokens so the model has at least 300 tokens for its reply.
+Changes vs original:
+  - _gather_data() is a sync helper; run() offloads it via asyncio.to_thread so
+    blocking DB/portfolio-engine calls never stall the event loop.
+  - LLM output is validated against per-intent Pydantic schemas via coerce_output().
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Dict, List
 
 from app.agents.core.base import AgentResult, AgentStatus, AgentTask, BaseAgent
 from app.agents.core.llm_client import LLMClient, LLMError
+from app.agents.core.output_schemas import (
+    PORTFOLIO_INTENT_SCHEMAS,
+    coerce_output,
+)
 from app.agents.tools.tools import ToolRegistry
 
 log = logging.getLogger(__name__)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# System prompt (shared across all sub-intents)
-# ──────────────────────────────────────────────────────────────────────────────
+# ── System prompt ──────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = """You are an AI portfolio analyst for a retail investment assistant.
 Rules:
@@ -36,11 +34,7 @@ Rules:
 4. Base every insight strictly on the data provided; never invent prices.
 5. Respond in the same language as the user's question (EN or ZH)."""
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Per-intent prompt builders
-# Each builder receives a compact data dict and returns a user-turn string.
-# They deliberately omit raw numbers > 5 items to minimise input token usage.
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Per-intent prompt builders ─────────────────────────────────────────────────
 
 def _build_portfolio_prompt(data: Dict) -> str:
     snap = data.get("portfolio", {})
@@ -115,10 +109,6 @@ Goals progress:
 User question: {data.get('question', 'Am I on track for my financial goals?')}"""
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Prompt dispatcher
-# ──────────────────────────────────────────────────────────────────────────────
-
 PROMPT_BUILDERS = {
     "portfolio_overview":  _build_portfolio_prompt,
     "risk_analysis":       _build_risk_prompt,
@@ -127,71 +117,70 @@ PROMPT_BUILDERS = {
     "goal_tracking":       _build_goal_prompt,
 }
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Agent
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Agent ──────────────────────────────────────────────────────────────────────
 
 class PortfolioAnalystAgent(BaseAgent):
-    """
-    Single-agent that handles all portfolio-related intents.
-    Extend by adding more prompt builders and registering them in PROMPT_BUILDERS.
-    """
     name = "portfolio_analyst"
     description = "Analyses portfolio structure, risk, performance, and goals."
 
     def __init__(self) -> None:
         self._llm = LLMClient()
 
+    # ── sync data gathering (called via asyncio.to_thread) ─────────────────────
+
+    def _gather_data(self, task: AgentTask, tools: ToolRegistry) -> Dict[str, Any]:
+        intent = task.context.get("intent", task.intent)
+        data: Dict[str, Any] = {"question": task.intent}
+        data["portfolio"] = tools.get_portfolio_snapshot()
+        if intent in ("risk_analysis", "rebalance_advice"):
+            data["risk"] = tools.get_risk_snapshot()
+        if intent == "performance_review":
+            data["analytics"] = tools.get_analytics_snapshot()
+        if intent == "goal_tracking":
+            data["goals"] = tools.get_goals_snapshot()
+        return data
+
+    # ── async entry point ──────────────────────────────────────────────────────
+
     async def run(self, task: AgentTask, tools: ToolRegistry) -> AgentResult:
         intent = task.context.get("intent", task.intent)
 
-        # ── 1. gather data via tools (no LLM calls) ───────────────────────────
-        data: Dict[str, Any] = {"question": task.intent}
+        # 1. Gather data — offload blocking DB + engine calls to thread pool
         try:
-            data["portfolio"] = tools.get_portfolio_snapshot()
-            if intent in ("risk_analysis", "rebalance_advice"):
-                data["risk"] = tools.get_risk_snapshot()
-            if intent == "performance_review":
-                data["analytics"] = tools.get_analytics_snapshot()
-            if intent == "goal_tracking":
-                data["goals"] = tools.get_goals_snapshot()
+            data = await asyncio.to_thread(self._gather_data, task, tools)
         except Exception as exc:
             log.warning("PortfolioAnalystAgent: tool error — %s", exc)
             return AgentResult(
-                task_id=task.task_id,
-                agent_name=self.name,
-                status=AgentStatus.FAILED,
-                error=f"Tool layer error: {exc}",
+                task_id=task.task_id, agent_name=self.name,
+                status=AgentStatus.FAILED, error=f"Tool layer error: {exc}",
             )
 
-        # ── 2. build prompt ───────────────────────────────────────────────────
+        # 2. Build prompt (CPU-only, stays on event loop)
         builder = PROMPT_BUILDERS.get(intent, _build_portfolio_prompt)
-        user_msg = builder(data)
-
         messages: List[Dict[str, str]] = [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user",   "content": user_msg},
+            {"role": "user",   "content": builder(data)},
         ]
 
-        # ── 3. call LLM ───────────────────────────────────────────────────────
+        # 3. LLM call
         try:
-            output, tokens = await self._llm.complete(
+            raw_output, tokens = await self._llm.complete(
                 messages, max_tokens=task.token_budget, db=tools._db
             )
         except LLMError as exc:
             log.error("PortfolioAnalystAgent LLM error: %s", exc)
             return AgentResult(
-                task_id=task.task_id,
-                agent_name=self.name,
-                status=AgentStatus.FAILED,
-                error=str(exc),
+                task_id=task.task_id, agent_name=self.name,
+                status=AgentStatus.FAILED, error=str(exc),
                 output={"raw_data": data},
             )
 
+        # 4. Schema validation — fills missing fields with safe defaults
+        schema = PORTFOLIO_INTENT_SCHEMAS.get(intent)
+        output = coerce_output(raw_output, schema) if schema else raw_output
+
         return AgentResult(
-            task_id=task.task_id,
-            agent_name=self.name,
+            task_id=task.task_id, agent_name=self.name,
             status=AgentStatus.DONE,
             output={**output, "intent": intent, "data_snapshot": data},
             tokens_used=tokens,

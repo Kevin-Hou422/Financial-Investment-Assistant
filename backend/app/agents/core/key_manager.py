@@ -15,11 +15,10 @@ Configuration (backend/.env):
 """
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import logging
 import random
-import time
+import threading
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
@@ -82,7 +81,10 @@ class KeyManager:
     """
 
     def __init__(self) -> None:
-        self._lock = asyncio.Lock()
+        # threading.Lock: pick() and record() are sync methods called from async
+        # context via the event loop thread — asyncio.Lock requires await and
+        # cannot be used in plain def methods.
+        self._lock = threading.Lock()
         self._keys: List[Tuple[str, str]] = []  # [(raw_key, key_hash), ...]
         self._limit = OPENAI_DAILY_TOKEN_LIMIT
         self._in_memory: Dict[str, int] = {}   # key_hash → tokens today (fast path)
@@ -110,29 +112,30 @@ class KeyManager:
         today = _today_utc()
         available = []
 
-        for raw, key_hash in self._keys:
-            if self._limit == 0:
-                available.append(raw)
-                continue
-            used = self._in_memory.get(key_hash, 0)
-            # Fast path: in-memory count
-            if used < self._limit:
-                available.append(raw)
-                continue
-            # Slow path: check DB (catches cross-restart usage)
-            if db:
-                try:
-                    db_used = _load_usage(db, key_hash, today)
-                    self._in_memory[key_hash] = db_used  # sync
-                    if db_used < self._limit:
-                        available.append(raw)
-                        continue
-                except Exception:
-                    available.append(raw)   # DB unavailable → optimistic
-            log.warning(
-                "KeyManager: key %s...%s hit daily limit (%d tokens)",
-                raw[:8], raw[-4:], self._limit,
-            )
+        with self._lock:
+            for raw, key_hash in self._keys:
+                if self._limit == 0:
+                    available.append(raw)
+                    continue
+                used = self._in_memory.get(key_hash, 0)
+                # Fast path: in-memory count
+                if used < self._limit:
+                    available.append(raw)
+                    continue
+                # Slow path: check DB (catches cross-restart usage)
+                if db:
+                    try:
+                        db_used = _load_usage(db, key_hash, today)
+                        self._in_memory[key_hash] = db_used  # sync in-memory
+                        if db_used < self._limit:
+                            available.append(raw)
+                            continue
+                    except Exception:
+                        available.append(raw)   # DB unavailable → optimistic
+                log.warning(
+                    "KeyManager: key %s...%s hit daily limit (%d tokens)",
+                    raw[:8], raw[-4:], self._limit,
+                )
 
         if not available:
             raise RuntimeError(
@@ -151,7 +154,8 @@ class KeyManager:
             return
         key_hash = _hash_key(key)
         today = _today_utc()
-        self._in_memory[key_hash] = self._in_memory.get(key_hash, 0) + tokens
+        with self._lock:
+            self._in_memory[key_hash] = self._in_memory.get(key_hash, 0) + tokens
         if db:
             try:
                 ensure_usage_table(db)

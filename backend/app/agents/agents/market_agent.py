@@ -1,18 +1,19 @@
 """
-MarketAnalystAgent — real-time market context analysis.
+MarketAnalystAgent — live market quotes, watchlist, alerts, sentiment.
 
-Responsibilities:
-  - Live price quotes for user's holdings via market interface
-  - Watchlist monitoring and alert flags
-  - Market sentiment summary relevant to the user's portfolio
+Changes vs original:
+  - _gather_data() offloaded via asyncio.to_thread.
+  - LLM output validated against MarketAnalysisOutput schema.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Dict, List
 
 from app.agents.core.base import AgentResult, AgentStatus, AgentTask, BaseAgent
 from app.agents.core.llm_client import LLMClient, LLMError
+from app.agents.core.output_schemas import MarketAnalysisOutput, coerce_output
 from app.agents.tools.tools import ToolRegistry
 
 log = logging.getLogger(__name__)
@@ -55,13 +56,17 @@ class MarketAnalystAgent(BaseAgent):
     def __init__(self) -> None:
         self._llm = LLMClient()
 
-    async def run(self, task: AgentTask, tools: ToolRegistry) -> AgentResult:
+    def _gather_data(self, task: AgentTask, tools: ToolRegistry) -> Dict[str, Any]:
         data: Dict[str, Any] = {"question": task.intent}
+        data["portfolio"] = tools.get_portfolio_snapshot()
+        data["watchlist"] = tools.get_raw_watchlist()
+        data["alerts"]    = tools.get_raw_alerts()
+        data["market"]    = tools.get_market_snapshot()
+        return data
+
+    async def run(self, task: AgentTask, tools: ToolRegistry) -> AgentResult:
         try:
-            data["portfolio"] = tools.get_portfolio_snapshot()
-            data["watchlist"] = tools.get_raw_watchlist()
-            data["alerts"]    = tools.get_raw_alerts()
-            data["market"]    = tools.get_market_snapshot()
+            data = await asyncio.to_thread(self._gather_data, task, tools)
         except Exception as exc:
             log.warning("MarketAnalystAgent tool error: %s", exc)
             return AgentResult(
@@ -75,7 +80,7 @@ class MarketAnalystAgent(BaseAgent):
         ]
 
         try:
-            output, tokens = await self._llm.complete(
+            raw_output, tokens = await self._llm.complete(
                 messages, max_tokens=task.token_budget, db=tools._db
             )
         except LLMError as exc:
@@ -84,6 +89,8 @@ class MarketAnalystAgent(BaseAgent):
                 task_id=task.task_id, agent_name=self.name,
                 status=AgentStatus.FAILED, error=str(exc),
             )
+
+        output = coerce_output(raw_output, MarketAnalysisOutput)
 
         return AgentResult(
             task_id=task.task_id, agent_name=self.name,
