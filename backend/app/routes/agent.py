@@ -15,8 +15,8 @@ from __future__ import annotations
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -29,6 +29,7 @@ from app.agents.core.memory import AgentMemory
 from app.agents.core.logger import AgentLogger
 from app.agents.core.cache import llm_cache
 from app.agents.core.key_manager import key_manager
+from app.utils.rate_limit import agent_chat_limiter
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
@@ -70,9 +71,9 @@ def agent_risk_analysis(
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
-    message: str
-    token_budget: Optional[int] = 600
-    session_id: Optional[str] = None
+    message: str = Field(..., min_length=1, max_length=10000)
+    token_budget: Optional[int] = Field(default=600, ge=100, le=1500)
+    session_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class AgentResultOut(BaseModel):
@@ -116,8 +117,13 @@ async def agent_chat(
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="message must not be empty")
 
-    user_id      = current_user.id
-    token_budget = max(100, min(req.token_budget or 600, 1500))
+    user_id = current_user.id
+    if not agent_chat_limiter.is_allowed(str(user_id)):
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded. Max 20 requests per minute per user.",
+        )
+    token_budget = max(100, min(req.token_budget or 600, 1500))  # belt-and-suspenders on top of Field
     task_id      = str(uuid.uuid4())[:8]
 
     intent         = manager_agent.parse_intent(req.message)
@@ -199,7 +205,7 @@ def get_key_usage(
 
 @router.get("/logs")
 def get_agent_logs(
-    limit: int = 50,
+    limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> dict:

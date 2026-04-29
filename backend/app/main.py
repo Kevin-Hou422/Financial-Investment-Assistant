@@ -1,5 +1,10 @@
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+log = logging.getLogger(__name__)
 
 from app.db.session import create_tables
 from app.routes import (
@@ -13,6 +18,16 @@ from app.routes.fx import router as fx_router
 from app.routes.ws_prices import router as ws_router
 
 app = FastAPI(title="AI Investment Assistant API")
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    log.error("Unhandled error on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An internal error occurred. Please try again."},
+    )
+
 
 app.add_middleware(
     CORSMiddleware,

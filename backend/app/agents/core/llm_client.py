@@ -10,6 +10,7 @@ Cache hit → 0 tokens charged, 0 API calls made.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any, Dict, List, Optional, Tuple
@@ -90,26 +91,35 @@ class LLMClient:
         temperature: float,
         db=None,
     ) -> Tuple[str, int, str]:
-        """Returns (raw_json_str, tokens_used, api_key_used)."""
-        api_key = key_manager.pick(db)   # random key selection + quota check
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model":           self.model,
-                    "messages":        messages,
-                    "max_tokens":      max_tokens,
-                    "temperature":     temperature,
-                    "response_format": {"type": "json_object"},
-                },
-            )
-        resp.raise_for_status()
-        data = resp.json()
-        content = data["choices"][0]["message"]["content"]
-        tokens  = data["usage"]["total_tokens"]
-        log.info("OpenAI %s | tokens=%d | key=...%s", self.model, tokens, api_key[-4:])
-        return content, tokens, api_key
+        """Returns (raw_json_str, tokens_used, api_key_used). Retries up to 3 times."""
+        api_key = key_manager.pick(db)
+        last_exc: Exception = RuntimeError("unreachable")
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {api_key}"},
+                        json={
+                            "model":           self.model,
+                            "messages":        messages,
+                            "max_tokens":      max_tokens,
+                            "temperature":     temperature,
+                            "response_format": {"type": "json_object"},
+                        },
+                    )
+                resp.raise_for_status()
+                data    = resp.json()
+                content = data["choices"][0]["message"]["content"]
+                tokens  = data["usage"]["total_tokens"]
+                log.info("OpenAI %s | tokens=%d | key=...%s", self.model, tokens, api_key[-4:])
+                return content, tokens, api_key
+            except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+                last_exc = exc
+                if attempt < 2:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+                    log.warning("OpenAI retry %d/3 after error: %s", attempt + 2, exc)
+        raise LLMError(f"OpenAI API failed after 3 attempts: {last_exc}") from last_exc
 
     # ── Ollama ────────────────────────────────────────────────────────────────
 

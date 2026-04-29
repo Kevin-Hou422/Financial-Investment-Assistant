@@ -20,7 +20,8 @@
 12. [Currency & FX Support](#12-currency--fx-support)
 13. [Authentication](#13-authentication)
 14. [Performance Optimizations](#14-performance-optimizations)
-15. [Known Limitations & Roadmap](#15-known-limitations--roadmap)
+15. [Security & Robustness](#15-security--robustness)
+16. [Known Limitations & Roadmap](#16-known-limitations--roadmap)
 
 ---
 
@@ -690,12 +691,89 @@ Login:    email + password -> verify bcrypt hash -> JWT (7d)
 
 ---
 
-## 15. Known Limitations & Roadmap
+## 15. Security & Robustness
+
+### 15.1 Input Validation
+
+All agent chat inputs are validated by Pydantic before reaching any business logic:
+
+| Field | Constraint | Reason |
+|---|---|---|
+| `message` | `min_length=1`, `max_length=10000` | Prevents empty sends and token-cost explosions from oversized payloads |
+| `token_budget` | `ge=100`, `le=1500` | Enforces LLM spend limits at the schema layer, not just in application code |
+| `session_id` | `max_length=128` | Prevents database index bloat from arbitrarily long session identifiers |
+| `GET /agent/logs?limit` | `ge=1`, `le=200` | Stops unbounded result-set queries |
+
+SQL injection is prevented throughout by SQLAlchemy parameterised queries (`.filter()` / `text()` with bound params). The `asset_type` field is validated against a strict regex `^(stock|fund|crypto|gold)$` at the ORM layer.
+
+### 15.2 Rate Limiting
+
+A sliding-window rate limiter (`utils/rate_limit.py`) is applied to `POST /api/agent/chat` — the most resource-intensive endpoint:
+
+| Scope | Limit | Window |
+|---|---|---|
+| Per authenticated user | 20 requests | 60 seconds |
+
+Requests that exceed the limit receive **HTTP 429** with a descriptive message. The limiter is in-memory (thread-safe via `threading.Lock`) and suitable for single-process deployments. For multi-process production, replace the `_store` dict with a Redis backend.
+
+In addition, OpenAI token consumption is capped at three levels:
+1. **Per-request** — `token_budget` field (100–1500 tokens)
+2. **Per-agent** — pipeline step definitions in `manager.py`
+3. **Per-key per day** — `OPENAI_DAILY_TOKEN_LIMIT` (default 100 000 tokens)
+
+### 15.3 LLM Retry Logic
+
+`LLMClient._openai()` now retries transient network and HTTP errors up to **3 times** with linear back-off (0.5 s, 1.0 s) before raising `LLMError`:
+
+```
+Attempt 1 → fail → wait 0.5 s
+Attempt 2 → fail → wait 1.0 s
+Attempt 3 → fail → raise LLMError("OpenAI API failed after 3 attempts: ...")
+```
+
+Only `httpx.HTTPStatusError` and `httpx.RequestError` trigger retries; JSON parse errors (`LLMError`) propagate immediately without retrying.
+
+### 15.4 Global Exception Handling
+
+`main.py` registers a catch-all exception handler so that any unhandled error returns a consistent JSON envelope instead of leaking a raw Python traceback:
+
+```json
+HTTP 500
+{ "detail": "An internal error occurred. Please try again." }
+```
+
+The full exception (type, message, traceback) is logged at `ERROR` level via Python's standard `logging` for server-side diagnostics.
+
+### 15.5 Authentication & Data Isolation
+
+| Mechanism | Detail |
+|---|---|
+| Password hashing | `passlib[bcrypt]` with 12 rounds |
+| JWT signing | HS256; secret loaded from `JWT_SECRET` env var — **must be changed for production** |
+| Token lifetime | 30 days (configurable via `JWT_EXPIRE_DAYS`) |
+| Google OAuth | Full PKCE-compatible redirect flow; user records upserted by `google_id` |
+| Per-user isolation | Every DB query filters on `user_id`; cross-user data access is structurally impossible via the ORM layer |
+| API key storage | Only a 16-character SHA-256 prefix of each key is stored in `api_key_usage` — raw secrets never touch the database |
+
+### 15.6 External API Resilience
+
+| Service | Strategy |
+|---|---|
+| yfinance (stock prices) | 3 retries with 0.4 s linear back-off → 3-minute in-memory cache → last-known-value fallback |
+| FX rates (`open.er-api.com`) | 1-hour cache → hardcoded fallback table; failed fetches back off 5 minutes before retry |
+| OpenAI API | 3 retries with 0.5 s / 1.0 s back-off (new) → `LLMError` propagated to caller |
+| LLM response cache | SHA-256 keyed, 5-minute TTL, 500-entry LRU — identical requests within the window cost zero tokens |
+
+---
+
+## 16. Known Limitations & Roadmap
 
 ### Current Limitations
 - **SQLite**: Not suitable for production multi-user scale; should migrate to PostgreSQL
 - **Google OAuth**: Requires a real verified domain and configured OAuth consent screen for production
 - **No mobile-responsive layout**: Designed primarily for desktop browsers
+- **In-memory rate limiter**: Resets on process restart; not shared across multiple worker processes — use Redis for production multi-process deployments
+- **No JWT revocation**: Issued tokens cannot be invalidated before expiry (no blacklist); logout is client-side only
 
 ### Previously Fixed
 | Issue | Resolution |
